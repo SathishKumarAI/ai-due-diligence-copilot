@@ -38,5 +38,6 @@ how to verify done against `docs/DEFINITION-OF-DONE.md`.
 
 ## Commands
 - Setup: `make setup`   Test: `make test`   Lint: `make lint`   Types: `make typecheck`
+- Generate data: `python scripts/generate_synthetic_data.py`
 - Ingest: `python -m app.ingest`   Run API: `make run`   Eval: `make eval`
 - Frontend: `cd web && npm run dev`
