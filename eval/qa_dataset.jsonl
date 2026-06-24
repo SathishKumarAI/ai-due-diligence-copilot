@@ -1,0 +1,10 @@
+{"question": "What is Acme Robotics' ARR and its year-over-year growth?", "expected_answer": "$12.4M ARR, up 39% YoY from $8.9M.", "expected_source": "acme_robotics_pitch.md"}
+{"question": "How much runway does the company have at its current burn rate?", "expected_answer": "About 12.8 months at ~$720k monthly net burn.", "expected_source": "acme_10k_excerpt.md"}
+{"question": "What is the customer concentration risk?", "expected_answer": "One customer is 22% of ARR; losing it would materially reduce revenue.", "expected_source": "acme_risk_factors.md"}
+{"question": "What is the post-money valuation in the Series B term sheet?", "expected_answer": "$220M post-money on a $40M raise.", "expected_source": "acme_term_sheet.md"}
+{"question": "What is the liquidation preference offered to Series B investors?", "expected_answer": "1x non-participating.", "expected_source": "acme_term_sheet.md"}
+{"question": "What is the company's gross margin?", "expected_answer": "61% gross margin.", "expected_source": "acme_robotics_pitch.md"}
+{"question": "What supply chain risk does the company face?", "expected_answer": "Key actuators come from a single overseas supplier; disruption could halt production 8-12 weeks.", "expected_source": "acme_risk_factors.md"}
+{"question": "Is the company profitable?", "expected_answer": "No; it has a net loss of about $6.9M and expects losses to continue.", "expected_source": "acme_10k_excerpt.md"}
+{"question": "What is the size of the post-financing option pool and who does it dilute?", "expected_answer": "12% post-financing, created pre-money, diluting existing holders.", "expected_source": "acme_term_sheet.md"}
+{"question": "What roles on the team are unfilled?", "expected_answer": "The VP of Sales role is vacant.", "expected_source": "acme_robotics_pitch.md"}
