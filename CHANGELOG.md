@@ -8,6 +8,9 @@ The same notes, in plain language, are published as
 [GitHub Releases](../../releases) and surfaced in the app's **What's New** page.
 
 ## [Unreleased]
+### Added
+- `scripts/generate_synthetic_data.py` — reproducible generator for the synthetic
+  deal-document corpus (seedable; no LLM/network).
 
 ## [0.1.0] — 2026-06-23
 ### Added
