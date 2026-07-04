@@ -17,9 +17,10 @@ from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.vectorstores import VectorStore
 
+from app import trace as _trace
 from app.prompts import CONDENSE_PROMPT, SYSTEM_PROMPT
 from app.rerank import NoOpReranker, Reranker
-from app.retrieval import DenseRetriever, Retriever
+from app.retrieval import DenseRetriever, HybridRetriever, Retriever
 
 _MARKER_RE = re.compile(r"\[(\d+)\]")
 _SNIPPET_LEN = 280
@@ -186,6 +187,91 @@ class RagEngine:
             citations=self._citations(text, docs),
             timings_ms=timings,
         )
+
+    def _retrieval_mode(self) -> str:
+        return "hybrid" if isinstance(self.retriever, HybridRetriever) else "dense"
+
+    def answer_with_trace(
+        self,
+        question: str,
+        top_k: int | None = None,
+        history: list[Turn] | None = None,
+    ) -> tuple[Answer, "_trace.PipelineTrace"]:
+        """Answer a question AND return a full pipeline trace (feature F23).
+
+        Same behaviour as :meth:`answer`, but records every stage — condensed query,
+        tokenization, retrieved chunks with dense scores, the exact prompt, and the
+        answer — so the introspection UI can render how the answer was produced.
+        """
+        k = top_k or self.top_k
+        timings: dict[str, float] = {}
+
+        tc = time.perf_counter()
+        query = self._condense(question, history)
+        if history:
+            timings["condense_ms"] = round((time.perf_counter() - tc) * 1000, 1)
+        condensed = bool(history) and query.strip() != question.strip()
+
+        t0 = time.perf_counter()
+        docs = self._retrieve(query, k)
+        timings["retrieve_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+
+        tok = _trace.tokenize_trace(query)
+        score_map = _trace.dense_scores(self.vectorstore, query, max(k, self.fetch_k))
+        retrieved = _trace.chunk_traces(docs, score_map)
+
+        if not docs:
+            ans = Answer(
+                question=question,
+                answer="The provided documents do not cover this.",
+                citations=[],
+                timings_ms=timings,
+            )
+            tr = _trace.PipelineTrace(
+                original_question=question,
+                condensed_query=query,
+                condensed=condensed,
+                tokenization=tok,
+                retrieval_mode=self._retrieval_mode(),
+                rerank_enabled=not isinstance(self.reranker, NoOpReranker),
+                retrieved=[],
+                context_char_len=0,
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt="",
+                answer=ans.answer,
+                timings_ms=timings,
+            )
+            return ans, tr
+
+        context = _format_context(docs)
+        messages = self._build_messages(question, context)
+
+        t1 = time.perf_counter()
+        response = self.llm.invoke(messages)
+        timings["generate_ms"] = round((time.perf_counter() - t1) * 1000, 1)
+        text = response.content if isinstance(response.content, str) else str(response.content)
+
+        ans = Answer(
+            question=question,
+            answer=text.strip(),
+            citations=self._citations(text, docs),
+            timings_ms=timings,
+        )
+        tr = _trace.PipelineTrace(
+            original_question=question,
+            condensed_query=query,
+            condensed=condensed,
+            tokenization=tok,
+            retrieval_mode=self._retrieval_mode(),
+            rerank_enabled=not isinstance(self.reranker, NoOpReranker),
+            retrieved=retrieved,
+            context_char_len=len(context),
+            system_prompt=messages[0][1],
+            user_prompt=messages[1][1],
+            answer=ans.answer,
+            timings_ms=timings,
+        )
+        return ans, tr
 
     def stream(
         self,

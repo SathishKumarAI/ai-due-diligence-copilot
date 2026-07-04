@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -134,6 +135,23 @@ _guarded = [Depends(require_api_key), Depends(rate_limit)]
 @app.post("/v1/ask", response_model=schemas.AskResponse, dependencies=_guarded, tags=["rag"])
 def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> schemas.AskResponse:
     top_k = req.top_k or settings.top_k
+
+    # Explain mode (F23): full pipeline trace, not cached (traces are for inspection).
+    if req.explain:
+        result, tr = engine.answer_with_trace(
+            req.question, top_k, history=_to_turns(req.history)
+        )
+        for stage, ms in result.timings_ms.items():
+            ASK_LATENCY.labels(stage.replace("_ms", "")).observe(ms / 1000.0)
+        return schemas.AskResponse(
+            question=result.question,
+            answer=result.answer,
+            citations=[schemas.Citation(**c.__dict__) for c in result.citations],
+            provider=engine.provider,
+            timings_ms=result.timings_ms,
+            trace=schemas.PipelineTraceModel(**asdict(tr)),
+        )
+
     cache: AnswerCache = app.state.cache
     cache_q = _cache_question(req.question, req.history)
     cached = cache.get(cache_q, top_k)
@@ -211,7 +229,8 @@ async def upload(
     """Add one document to the live index (feature F18).
 
     Body is the raw file bytes (no multipart dependency); ``filename`` carries the
-    name. Supported: .pdf .md .markdown .txt. Re-uploading the same name replaces it.
+    name. Supported: .pdf .md .markdown .txt and images (.png/.jpg/...) via OCR (F20).
+    Re-uploading the same name replaces it.
     """
     from app.ingest import SUPPORTED_SUFFIXES, add_file_to_store
 
