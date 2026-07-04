@@ -23,12 +23,16 @@ from app.retrieval import (
 # --- F16: BM25 + RRF fusion ---------------------------------------------------
 
 
-def test_bm25_ranks_exact_term_match_first(sample_docs):
-    bm25 = BM25Index(sample_docs)
-    hits = bm25.search("liquidation preference valuation", k=3)
+def test_bm25_ranks_exact_term_match_first():
+    # Domain-neutral so this engine test is identical across all three repos.
+    docs = [
+        Document(page_content="the exact term appears here in this passage", metadata={"source": "a"}),
+        Document(page_content="an unrelated passage about other topics", metadata={"source": "b"}),
+    ]
+    bm25 = BM25Index(docs)
+    hits = bm25.search("exact term", k=2)
     assert hits, "BM25 should find lexical matches"
-    # The term-sheet chunk mentions valuation; it should rank top for that query.
-    assert "valuation" in hits[0].page_content.lower()
+    assert hits[0].metadata["source"] == "a"
 
 
 def test_bm25_keeps_figures_whole():
