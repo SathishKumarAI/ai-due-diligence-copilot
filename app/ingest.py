@@ -5,6 +5,7 @@ load (pdf/md/txt) -> split -> embed -> persist to a Chroma collection.
 Run as a module to (re)build the index:
     python -m app.ingest
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,12 +18,25 @@ from langchain_core.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.cache import wrap_embeddings
-from app.config import Settings, settings as default_settings
+from app.config import Settings
+from app.config import settings as default_settings
 from app.providers import get_embeddings
 
 logger = logging.getLogger(__name__)
 
 _SUPPORTED = {".pdf", ".md", ".txt", ".markdown"}
+
+
+def load_one(path: Path) -> list[Document]:
+    """Load a single supported file, stamping source/page metadata."""
+    if path.suffix.lower() == ".pdf":
+        loaded = PyPDFLoader(str(path)).load()
+    else:
+        loaded = TextLoader(str(path), encoding="utf-8").load()
+    for d in loaded:
+        d.metadata["source"] = path.name
+        d.metadata.setdefault("page", d.metadata.get("page"))
+    return loaded
 
 
 def load_documents(data_dir: Path) -> list[Document]:
@@ -31,14 +45,7 @@ def load_documents(data_dir: Path) -> list[Document]:
     for path in sorted(data_dir.rglob("*")):
         if path.suffix.lower() not in _SUPPORTED or not path.is_file():
             continue
-        if path.suffix.lower() == ".pdf":
-            loaded = PyPDFLoader(str(path)).load()
-        else:
-            loaded = TextLoader(str(path), encoding="utf-8").load()
-        for d in loaded:
-            d.metadata["source"] = path.name
-            d.metadata.setdefault("page", d.metadata.get("page"))
-        docs.extend(loaded)
+        docs.extend(load_one(path))
     return docs
 
 
@@ -51,9 +58,7 @@ def split_documents(docs: list[Document], settings: Settings) -> list[Document]:
     return splitter.split_documents(docs)
 
 
-def build_index(
-    settings: Settings | None = None, embeddings: Embeddings | None = None
-) -> dict:
+def build_index(settings: Settings | None = None, embeddings: Embeddings | None = None) -> dict:
     """Build (or rebuild) the Chroma index from settings.data_dir.
 
     Idempotent: the collection is reset so re-running reflects the current corpus.
@@ -96,8 +101,36 @@ def load_index(settings: Settings, embeddings: Embeddings) -> Chroma:
     )
 
 
+SUPPORTED_SUFFIXES = _SUPPORTED
+
+
+def add_file_to_store(store: Chroma, path: Path, settings: Settings) -> int:
+    """Incrementally add one file's chunks to a live Chroma store (feature F18).
+
+    Idempotent per filename: any existing chunks for the same ``source`` are removed
+    first, so re-uploading replaces rather than duplicates. Returns chunks added.
+    """
+    if path.suffix.lower() not in _SUPPORTED:
+        raise ValueError(f"Unsupported file type: {path.suffix}")
+
+    # Drop any prior chunks for this source name (idempotent re-upload).
+    try:
+        store.delete(where={"source": path.name})  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001 - nothing to delete on first upload
+        pass
+
+    docs = load_one(path)
+    if not docs or not any(d.page_content.strip() for d in docs):
+        raise ValueError("File contained no readable text")
+    chunks = split_documents(docs, settings)
+    store.add_documents(chunks)
+    return len(chunks)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     out = build_index()
-    print(f"Ingested {out['documents']} documents into "
-          f"{out['chunks']} chunks (collection: {out['collection']}).")
+    print(
+        f"Ingested {out['documents']} documents into "
+        f"{out['chunks']} chunks (collection: {out['collection']})."
+    )

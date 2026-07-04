@@ -9,6 +9,15 @@ sidebar_position: 2
 > Prioritized work. Each shipped feature links to its spec (the source of truth).
 > P0 = core RAG correctness, P1 = production hardening, P2 = future / nice-to-have.
 
+## Shipped (Unreleased — since v0.1.0)
+
+| ID | Feature | Pri | Spec |
+|----|---------|-----|------|
+| F16 | Hybrid retrieval (BM25 + dense, RRF) | P2 | [F16](specs/F16-hybrid-retrieval.md) |
+| F17 | Re-ranker (cross-encoder) | P2 | [F17](specs/F17-reranker.md) |
+| F18 | Per-document upload via UI | P2 | [F18](specs/F18-upload.md) |
+| F19 | Conversation memory + answer feedback | P2 | [F19](specs/F19-conversation-feedback.md) |
+
 ## Shipped (v0.1.0)
 
 | ID | Feature | Pri | Spec |
@@ -33,11 +42,10 @@ sidebar_position: 2
 
 | Idea | Why |
 |------|-----|
-| Hybrid retrieval (BM25 + dense) | better recall on exact figures/codes |
-| Re-ranker (cross-encoder) | sharper top-k before generation |
-| Per-document upload via UI | let non-technical users add their own files |
-| Conversation memory / follow-ups | multi-turn Q&A over the same corpus |
-| Answer feedback (👍/👎) + capture | build an eval set from real usage |
+| Provider-hosted re-ranker (Voyage) | drop the local cross-encoder when on the Claude provider |
+| Bulk / multi-file upload | ingest a folder of deal docs in one action |
+| Server-side conversation persistence | resume threads across devices (needs accounts) |
+| Promote feedback → eval set | auto-build `eval/qa_dataset.jsonl` from 👍/👎 capture |
 | Auth via API gateway / SSO | when multi-tenant |
 
 > When a P2 item gets picked up, write its spec in `specs/` **before** coding.

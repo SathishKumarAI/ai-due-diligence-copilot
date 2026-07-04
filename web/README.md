@@ -1,8 +1,9 @@
 # Web UI — AI Due Diligence Copilot
 
-A friendly Next.js front end for non-technical users. Ask a question in plain
-language, get an answer with clickable source citations, and see a **What's New**
-feed of recent changes.
+A friendly Next.js front end for non-technical users. Hold a **multi-turn
+conversation** with the documents, watch answers **stream** in with clickable
+source citations, **upload your own** deal documents, give **👍/👎 feedback**, and
+see a **What's New** feed of recent changes — in light or dark mode.
 
 ## Run locally
 
@@ -20,8 +21,14 @@ The backend (FastAPI) must be running and reachable at `NEXT_PUBLIC_API_BASE_URL
 
 | Route | What it does |
 |-------|--------------|
-| `/` | Ask box + example questions; renders the answer and its source citations |
+| `/` | Chat interface: multi-turn Q&A with streaming answers, inline citation chips, document upload, and per-answer feedback |
 | `/whats-new` | Plain-language release notes, pulled live from the repo's GitHub Releases |
+
+## Components
+
+`components/` holds the UI: `Chat` (orchestrates the thread, history, and
+streaming), `AnswerText` (renders `[n]` chips), `CitationList`, `FeedbackButtons`
+(F19), `UploadButton` (F18), `StatusBadge` (polls `/ready`), and `ThemeToggle`.
 
 ## Deploy
 

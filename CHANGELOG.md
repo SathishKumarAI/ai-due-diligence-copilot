@@ -11,6 +11,25 @@ The same notes, in plain language, are published as
 ### Added
 - `scripts/generate_synthetic_data.py` — reproducible generator for the synthetic
   deal-document corpus (seedable; no LLM/network).
+- **F16 — Hybrid retrieval.** Lexical BM25 (dependency-free, in-process) fused with
+  dense vector search via Reciprocal Rank Fusion; lifts recall on exact figures and
+  codes. Toggle with `RETRIEVAL_MODE=hybrid|dense`.
+- **F17 — Cross-encoder re-ranker.** Optional `RERANK_ENABLED` pass that re-scores
+  retrieved candidates with a cross-encoder (via the already-bundled
+  `sentence-transformers`) before generation.
+- **F18 — Per-document upload.** `POST /v1/upload` (raw body, no new dependency) and
+  a web upload control add a PDF/Markdown/text file to the live index; re-upload of
+  the same name replaces it.
+- **F19 — Conversation memory + feedback.** `/v1/ask` accepts prior `history` and
+  condenses follow-ups into standalone queries; new `POST /v1/feedback` captures
+  👍/👎 to `data/feedback.jsonl` for a usage-grounded eval set.
+- **Web UI redesign.** Chat-style multi-turn interface with token streaming, inline
+  clickable citation chips, document upload, answer feedback, a live index-health
+  badge, and light/dark themes.
+
+### Changed
+- `RagEngine` now depends on small `Retriever` / `Reranker` seams (injectable,
+  faked in tests) rather than calling the vector store directly.
 
 ## [0.1.0] — 2026-06-23
 ### Added

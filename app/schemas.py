@@ -1,12 +1,26 @@
 """Pydantic request/response models for the API (feature F05)."""
+
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+class Turn(BaseModel):
+    """One prior conversation exchange supplied by the client (feature F19)."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1)
 
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=3, examples=["What are the main risks?"])
     top_k: int | None = Field(None, ge=1, le=20)
+    history: list[Turn] = Field(
+        default_factory=list,
+        description="Prior turns, oldest first, for multi-turn follow-ups (F19).",
+    )
 
 
 class Citation(BaseModel):
@@ -39,6 +53,26 @@ class SourceItem(BaseModel):
 class SourcesResponse(BaseModel):
     sources: list[SourceItem]
     total_chunks: int
+
+
+class UploadResponse(BaseModel):
+    filename: str
+    chunks_added: int
+    collection: str
+
+
+class FeedbackRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    answer: str = Field(..., min_length=1)
+    rating: Literal["up", "down"]
+    comment: str | None = Field(None, max_length=2000)
+
+
+class FeedbackResponse(BaseModel):
+    ok: bool
+    up: int
+    down: int
+    total: int
 
 
 class HealthResponse(BaseModel):

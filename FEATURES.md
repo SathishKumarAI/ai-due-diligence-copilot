@@ -20,5 +20,9 @@ Each feature has a spec in [`docs/specs/`](docs/specs/) (the source of truth).
 | F13 | CI/CD + quality gates | ✅ | [F13](docs/specs/F13-cicd.md) |
 | F14 | Web UI (non-technical) | ✅ | [F14](docs/specs/F14-web-ui.md) |
 | F15 | Release notes / What's New | ✅ | [F15](docs/specs/F15-release-notes.md) |
+| F16 | Hybrid retrieval (BM25 + dense, RRF) | ✅ | [F16](docs/specs/F16-hybrid-retrieval.md) |
+| F17 | Cross-encoder re-ranker | ✅ | [F17](docs/specs/F17-reranker.md) |
+| F18 | Per-document upload via UI | ✅ | [F18](docs/specs/F18-upload.md) |
+| F19 | Conversation memory + answer feedback | ✅ | [F19](docs/specs/F19-conversation-feedback.md) |
 
 Backlog and future ideas: [`docs/BACKLOG.md`](docs/BACKLOG.md).

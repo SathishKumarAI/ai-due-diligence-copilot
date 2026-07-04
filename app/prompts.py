@@ -20,3 +20,11 @@ Rules:
 - Be concise and structured. Lead with the answer, then supporting detail.
 
 This is informational analysis, not investment advice."""
+
+
+# Rewrites a follow-up into a standalone question using the prior turns (F19), so
+# retrieval works on a self-contained query. Output is the query only — no answer.
+CONDENSE_PROMPT = """Given the conversation so far and a follow-up question, rewrite the \
+follow-up as a single standalone question that can be understood without the prior \
+turns. Resolve pronouns and implicit references using the history. If the follow-up \
+is already standalone, return it unchanged. Output ONLY the rewritten question, nothing else."""

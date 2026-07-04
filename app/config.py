@@ -4,6 +4,7 @@ A single PROVIDER switch picks the model backend:
   - "ollama" (default): free, local — llama3.1 + HuggingFace embeddings
   - "claude": Anthropic Claude + Voyage embeddings (needs API keys)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -36,6 +37,22 @@ class Settings(BaseSettings):
     chunk_overlap: int = 150
     top_k: int = 5
     max_tokens: int = 2000
+
+    # --- hybrid retrieval (F16) ---
+    retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
+    retrieve_fetch_k: int = 20  # candidates each arm fetches before fusion / rerank
+    rrf_k: int = 60  # Reciprocal Rank Fusion constant
+
+    # --- re-ranking (F17) ---
+    rerank_enabled: bool = False
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+    # --- upload (F18) ---
+    max_upload_mb: int = 25
+
+    # --- conversation memory (F19) ---
+    history_max_turns: int = 6  # most recent turns kept when condensing follow-ups
+    feedback_path: Path = PROJECT_ROOT / "data" / "feedback.jsonl"
 
     # --- storage ---
     data_dir: Path = PROJECT_ROOT / "data"

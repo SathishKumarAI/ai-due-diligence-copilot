@@ -7,6 +7,8 @@ export type Citation = {
   snippet: string;
 };
 
+export type Turn = { role: "user" | "assistant"; content: string };
+
 export type AskResponse = {
   question: string;
   answer: string;
@@ -16,20 +18,133 @@ export type AskResponse = {
   timings_ms: Record<string, number>;
 };
 
-export async function ask(question: string, topK?: number): Promise<AskResponse> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
   if (siteConfig.apiKey) headers["X-API-Key"] = siteConfig.apiKey;
+  return headers;
+}
 
+async function asError(res: Response): Promise<Error> {
+  let detail = res.statusText;
+  try {
+    const body = await res.json();
+    detail = body?.detail ?? JSON.stringify(body);
+  } catch {
+    detail = (await res.text().catch(() => res.statusText)) || res.statusText;
+  }
+  return new Error(`${res.status}: ${detail}`);
+}
+
+/** Non-streaming ask. Falls back here when streaming isn't desired. */
+export async function ask(
+  question: string,
+  history: Turn[] = [],
+  topK?: number,
+): Promise<AskResponse> {
   const res = await fetch(`${siteConfig.apiBaseUrl}/v1/ask`, {
     method: "POST",
-    headers,
-    body: JSON.stringify({ question, top_k: topK ?? null }),
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, history, top_k: topK ?? null }),
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`Backend error ${res.status}: ${detail}`);
-  }
+  if (!res.ok) throw await asError(res);
   return res.json();
+}
+
+/** Streaming ask over SSE-on-POST: parses the event stream from the response body. */
+export async function askStream(
+  question: string,
+  history: Turn[],
+  onToken: (t: string) => void,
+  signal?: AbortSignal,
+): Promise<{ citations: Citation[] }> {
+  const res = await fetch(`${siteConfig.apiBaseUrl}/v1/ask/stream`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, history, top_k: null }),
+    signal,
+  });
+  if (!res.ok || !res.body) throw await asError(res);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let citations: Citation[] = [];
+
+  // SSE frames are separated by a blank line; each frame has event: / data: lines.
+  const handleFrame = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+    }
+    const data = dataLines.join("\n");
+    if (event === "token") onToken(data);
+    else if (event === "citations") {
+      try {
+        citations = JSON.parse(data) as Citation[];
+      } catch {
+        /* ignore malformed trailing frame */
+      }
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      handleFrame(buffer.slice(0, sep));
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+  if (buffer.trim()) handleFrame(buffer);
+  return { citations };
+}
+
+export type UploadResult = {
+  filename: string;
+  chunks_added: number;
+  collection: string;
+};
+
+export async function uploadDocument(file: File): Promise<UploadResult> {
+  const res = await fetch(
+    `${siteConfig.apiBaseUrl}/v1/upload?filename=${encodeURIComponent(file.name)}`,
+    { method: "POST", headers: authHeaders(), body: file },
+  );
+  if (!res.ok) throw await asError(res);
+  return res.json();
+}
+
+export type FeedbackResult = { ok: boolean; up: number; down: number; total: number };
+
+export async function sendFeedback(
+  question: string,
+  answer: string,
+  rating: "up" | "down",
+  comment?: string,
+): Promise<FeedbackResult> {
+  const res = await fetch(`${siteConfig.apiBaseUrl}/v1/feedback`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, answer, rating, comment: comment ?? null }),
+  });
+  if (!res.ok) throw await asError(res);
+  return res.json();
+}
+
+export type ReadyState = { ready: boolean; indexed_chunks: number };
+
+export async function fetchReady(): Promise<ReadyState | null> {
+  try {
+    const res = await fetch(`${siteConfig.apiBaseUrl}/ready`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export type Release = {

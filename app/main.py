@@ -3,12 +3,15 @@
 The RAG engine is built once at startup and stored on app.state, so requests are
 cheap and tests can override the dependency with a fake engine.
 """
+
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -17,6 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from app import schemas
 from app.cache import AnswerCache, wrap_embeddings
 from app.config import settings
+from app.feedback import feedback_summary, record_feedback
 from app.observability import (
     ASK_LATENCY,
     CACHE_HITS,
@@ -25,7 +29,9 @@ from app.observability import (
     log,
 )
 from app.providers import get_embeddings, get_llm
-from app.rag import RagEngine
+from app.rag import RagEngine, Turn
+from app.rerank import build_reranker
+from app.retrieval import build_retriever
 from app.security import rate_limit, require_api_key
 
 
@@ -36,7 +42,28 @@ def build_engine() -> RagEngine:
     embeddings = wrap_embeddings(get_embeddings(settings), settings)
     store = load_index(settings, embeddings)
     llm = get_llm(settings)
-    return RagEngine(store, llm, top_k=settings.top_k, provider=settings.provider)
+    return RagEngine(
+        store,
+        llm,
+        top_k=settings.top_k,
+        provider=settings.provider,
+        retriever=build_retriever(store, settings),
+        reranker=build_reranker(settings),
+        fetch_k=settings.retrieve_fetch_k,
+        history_max_turns=settings.history_max_turns,
+    )
+
+
+def _to_turns(history: list[schemas.Turn]) -> list[Turn]:
+    return [Turn(role=t.role, content=t.content) for t in history]
+
+
+def _cache_question(question: str, history: list[schemas.Turn]) -> str:
+    """Cache key fold-in: follow-ups must not collide with the same words asked cold."""
+    if not history:
+        return question
+    tail = json.dumps([(t.role, t.content) for t in history], ensure_ascii=False)
+    return f"{question}\x00{tail}"
 
 
 @asynccontextmanager
@@ -108,12 +135,13 @@ _guarded = [Depends(require_api_key), Depends(rate_limit)]
 def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> schemas.AskResponse:
     top_k = req.top_k or settings.top_k
     cache: AnswerCache = app.state.cache
-    cached = cache.get(req.question, top_k)
+    cache_q = _cache_question(req.question, req.history)
+    cached = cache.get(cache_q, top_k)
     if cached is not None:
         CACHE_HITS.inc()
         return schemas.AskResponse(**cached, cached=True)
 
-    result = engine.answer(req.question, top_k)
+    result = engine.answer(req.question, top_k, history=_to_turns(req.history))
     for stage, ms in result.timings_ms.items():
         ASK_LATENCY.labels(stage.replace("_ms", "")).observe(ms / 1000.0)
 
@@ -124,7 +152,7 @@ def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> sch
         provider=engine.provider,
         timings_ms=result.timings_ms,
     )
-    cache.set(req.question, top_k, payload.model_dump(exclude={"cached"}))
+    cache.set(cache_q, top_k, payload.model_dump(exclude={"cached"}))
     return payload
 
 
@@ -133,7 +161,7 @@ async def ask_stream(req: schemas.AskRequest, engine: RagEngine = Depends(get_en
     top_k = req.top_k or settings.top_k
 
     async def event_gen():
-        for kind, payload in engine.stream(req.question, top_k):
+        for kind, payload in engine.stream(req.question, top_k, history=_to_turns(req.history)):
             if kind == "token":
                 yield {"event": "token", "data": payload}
             else:
@@ -167,6 +195,73 @@ def sources(engine: RagEngine = Depends(get_engine)) -> schemas.SourcesResponse:
         raise HTTPException(500, f"Could not read sources: {exc}") from exc
     items = [schemas.SourceItem(source=s, chunks=c) for s, c in sorted(counts.items())]
     return schemas.SourcesResponse(sources=items, total_chunks=sum(counts.values()))
+
+
+@app.post(
+    "/v1/upload",
+    response_model=schemas.UploadResponse,
+    dependencies=_guarded,
+    tags=["rag"],
+)
+async def upload(
+    request: Request,
+    filename: str = Query(..., min_length=1, description="Original file name"),
+    engine: RagEngine = Depends(get_engine),
+) -> schemas.UploadResponse:
+    """Add one document to the live index (feature F18).
+
+    Body is the raw file bytes (no multipart dependency); ``filename`` carries the
+    name. Supported: .pdf .md .markdown .txt. Re-uploading the same name replaces it.
+    """
+    from app.ingest import SUPPORTED_SUFFIXES, add_file_to_store
+
+    safe_name = Path(filename).name  # strip any path traversal
+    suffix = Path(safe_name).suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise HTTPException(415, f"Unsupported file type: {suffix or 'none'}")
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "Empty upload")
+    if len(body) > settings.max_upload_mb * 1024 * 1024:
+        raise HTTPException(413, f"File exceeds {settings.max_upload_mb} MB limit")
+
+    uploads = settings.data_dir / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    dest = uploads / safe_name
+    dest.write_bytes(body)
+
+    try:
+        added = add_file_to_store(engine.vectorstore, dest, settings)
+    except ValueError as exc:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+
+    # Refresh retrieval so the lexical (BM25) arm sees the new chunks (F16 + F18).
+    engine.retriever = build_retriever(engine.vectorstore, settings)
+    log.info("upload_indexed", filename=safe_name, chunks=added)
+    return schemas.UploadResponse(
+        filename=safe_name, chunks_added=added, collection=settings.collection_name
+    )
+
+
+@app.post(
+    "/v1/feedback",
+    response_model=schemas.FeedbackResponse,
+    dependencies=_guarded,
+    tags=["rag"],
+)
+def feedback(req: schemas.FeedbackRequest) -> schemas.FeedbackResponse:
+    """Capture 👍/👎 on an answer to seed a usage-grounded eval set (feature F19)."""
+    record_feedback(
+        settings.feedback_path,
+        question=req.question,
+        answer=req.answer,
+        rating=req.rating,
+        comment=req.comment,
+    )
+    summary = feedback_summary(settings.feedback_path)
+    return schemas.FeedbackResponse(ok=True, **summary)
 
 
 @app.exception_handler(Exception)
