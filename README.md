@@ -4,8 +4,25 @@
 > over deal documents and **cites the source passage for every claim**. Runs free
 > and offline by default (Ollama + open-source embeddings); swap one env var for
 > Claude. Ships with a friendly web UI for non-technical users.
+>
+> Also a **learning companion**: a built-in **pipeline inspector** shows exactly how
+> each answer is produced — text → tokens → chunks → retrieval scores → prompt →
+> grounded answer — so the RAG isn't a black box. See [`docs/HOW-RAG-WORKS.md`](docs/HOW-RAG-WORKS.md).
 
 ![status](https://img.shields.io/badge/status-portfolio-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+
+## Capabilities
+
+| | |
+|---|---|
+| **Grounded answers + citations** | Every claim maps to a retrieved passage (F03) |
+| **Hybrid retrieval + rerank** | BM25 + dense fused with RRF (F16), optional cross-encoder (F17) |
+| **OCR ingestion** | Scanned PDFs + images via local Tesseract (F20) |
+| **Cleaning pipeline** | Normalize, strip headers/footers, dedupe chunks (F21) |
+| **Hardened prompts** | Prompt-injection resistant system prompt (F21) |
+| **Open corpus fetch** | Real SEC EDGAR 10-Ks, redistributable (F22) |
+| **Pipeline inspector** | `explain=true` returns a full trace; UI renders it (F23) |
+| **Local-first** | Ollama (GPU) default, no keys; cloud (Claude+Voyage) optional |
 
 ## What it does
 
@@ -54,6 +71,26 @@ curl -s localhost:8000/v1/ask -H 'content-type: application/json' \
 ```
 
 Use Claude instead: set `PROVIDER=claude`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
+
+**OCR + real corpus (optional):**
+
+```bash
+bash scripts/install-ocr.sh          # Tesseract + Poppler (Linux; Windows notes in docs/INGESTION.md)
+python scripts/fetch_corpus.py       # pull real, open SEC EDGAR 10-Ks into data/corpus/
+python -m app.ingest                 # OCRs scanned PDFs/images and re-indexes
+```
+
+**See the pipeline:** ask with `explain=true`, or click **🔍 inspect pipeline** in the UI:
+
+```bash
+curl -s localhost:8000/v1/ask -H 'content-type: application/json' \
+  -d '{"question":"What are the main risks?","explain":true}' | jq .trace
+```
+
+> **Running on Windows + GPU:** this repo is developed on Linux but runs great on a
+> Windows machine with an NVIDIA GPU. Ollama uses the GPU automatically; install
+> Tesseract (UB-Mannheim) + Poppler and add them to PATH for OCR. Full walkthrough:
+> [`docs/INGESTION.md`](docs/INGESTION.md).
 
 ## Quick start (frontend)
 
