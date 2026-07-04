@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { askStream, type Citation, type Turn } from "@/lib/api";
+import { askExplain, askStream, type Citation, type PipelineTrace, type Turn } from "@/lib/api";
 import { siteConfig } from "@/lib/config";
 import { AnswerText } from "./AnswerText";
 import { CitationList } from "./CitationList";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { TracePanel } from "./TracePanel";
 
 type Message = {
   id: number;
@@ -20,6 +21,7 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [traces, setTraces] = useState<Record<number, PipelineTrace | "loading" | "error">>({});
   const bottom = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
@@ -36,6 +38,24 @@ export function Chat() {
     document
       .getElementById(`msg-${assistantId}-cite-${marker}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // F23: re-ask this turn with explain=true to fetch and show the pipeline trace.
+  async function inspect(assistantId: number) {
+    const userIdx = messages.findIndex((x) => x.id === assistantId - 1);
+    const question = messages[userIdx]?.content ?? "";
+    if (!question) return;
+    const history: Turn[] = messages
+      .slice(0, userIdx)
+      .filter((x) => !x.error)
+      .map((x) => ({ role: x.role, content: x.content }));
+    setTraces((t) => ({ ...t, [assistantId]: "loading" }));
+    try {
+      const res = await askExplain(question, history);
+      setTraces((t) => ({ ...t, [assistantId]: res.trace ?? "error" }));
+    } catch {
+      setTraces((t) => ({ ...t, [assistantId]: "error" }));
+    }
   }
 
   async function send(text: string) {
@@ -118,12 +138,32 @@ export function Chat() {
                           <CitationList citations={m.citations} idPrefix={`msg-${m.id}`} />
                         )}
                         {!m.streaming && !m.error && m.content && (
-                          <FeedbackButtons
-                            question={
-                              messages.find((u) => u.id === m.id - 1)?.content ?? ""
-                            }
-                            answer={m.content}
-                          />
+                          <>
+                            <div className="flex items-center gap-3">
+                              <FeedbackButtons
+                                question={
+                                  messages.find((u) => u.id === m.id - 1)?.content ?? ""
+                                }
+                                answer={m.content}
+                              />
+                              <button
+                                onClick={() => inspect(m.id)}
+                                disabled={traces[m.id] === "loading"}
+                                className="text-xs muted transition hover:text-[var(--accent)] disabled:opacity-50"
+                                title="Show how this answer was built (F23)"
+                              >
+                                {traces[m.id] === "loading" ? "🔍 inspecting…" : "🔍 inspect pipeline"}
+                              </button>
+                            </div>
+                            {traces[m.id] === "error" && (
+                              <p className="mt-2 text-xs text-red-500">
+                                Could not load the trace. Is the backend running?
+                              </p>
+                            )}
+                            {traces[m.id] && traces[m.id] !== "loading" && traces[m.id] !== "error" && (
+                              <TracePanel trace={traces[m.id] as PipelineTrace} />
+                            )}
+                          </>
                         )}
                       </>
                     )}

@@ -24,5 +24,12 @@ Each feature has a spec in [`docs/specs/`](docs/specs/) (the source of truth).
 | F17 | Cross-encoder re-ranker | ✅ | [F17](docs/specs/F17-reranker.md) |
 | F18 | Per-document upload via UI | ✅ | [F18](docs/specs/F18-upload.md) |
 | F19 | Conversation memory + answer feedback | ✅ | [F19](docs/specs/F19-conversation-feedback.md) |
+| F20 | OCR ingestion (scanned PDF + images, local Tesseract) | ✅ | [F20](docs/specs/F20-ocr.md) |
+| F21 | Cleaning pipeline + hardened prompts | ✅ | [F21](docs/specs/F21-cleaning-prompts.md) |
+| F22 | Open-access corpus fetch (SEC EDGAR) | ✅ | [F22](docs/specs/F22-corpus.md) |
+| F23 | Pipeline trace + introspection UI | ✅ | [F23](docs/specs/F23-trace-introspection.md) |
+
+Understand the pipeline: [`docs/HOW-RAG-WORKS.md`](docs/HOW-RAG-WORKS.md) ·
+[`docs/INGESTION.md`](docs/INGESTION.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 Backlog and future ideas: [`docs/BACKLOG.md`](docs/BACKLOG.md).

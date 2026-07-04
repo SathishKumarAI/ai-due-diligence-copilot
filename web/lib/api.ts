@@ -9,6 +9,42 @@ export type Citation = {
 
 export type Turn = { role: "user" | "assistant"; content: string };
 
+// --- pipeline trace / introspection (F23) ---
+export type TokenizationTrace = {
+  text: string;
+  char_count: number;
+  word_count: number;
+  tokens: string[];
+  token_count: number;
+  tokenizer: string;
+  note: string;
+};
+
+export type RetrievedChunkTrace = {
+  rank: number;
+  source: string;
+  page: number | null;
+  extraction_method: string;
+  chars: number;
+  dense_score: number | null;
+  snippet: string;
+};
+
+export type PipelineTrace = {
+  original_question: string;
+  condensed_query: string;
+  condensed: boolean;
+  tokenization: TokenizationTrace;
+  retrieval_mode: string;
+  rerank_enabled: boolean;
+  retrieved: RetrievedChunkTrace[];
+  context_char_len: number;
+  system_prompt: string;
+  user_prompt: string;
+  answer: string;
+  timings_ms: Record<string, number>;
+};
+
 export type AskResponse = {
   question: string;
   answer: string;
@@ -16,7 +52,23 @@ export type AskResponse = {
   provider: string;
   cached: boolean;
   timings_ms: Record<string, number>;
+  trace?: PipelineTrace | null;
 };
+
+/** Ask with explain=true to get the full pipeline trace (F23). Not streamed. */
+export async function askExplain(
+  question: string,
+  history: Turn[] = [],
+  topK?: number,
+): Promise<AskResponse> {
+  const res = await fetch(`${siteConfig.apiBaseUrl}/v1/ask`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, history, top_k: topK ?? null, explain: true }),
+  });
+  if (!res.ok) throw await asError(res);
+  return res.json();
+}
 
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = { ...extra };
