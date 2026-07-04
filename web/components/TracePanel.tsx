@@ -129,8 +129,8 @@ function ChunkRow({
         >
           {chunk.extraction_method}
         </span>
-        <span className="ml-auto font-mono muted">
-          {chunk.dense_score !== null ? chunk.dense_score.toFixed(3) : "—"}
+        <span className="ml-auto font-mono muted" title="Vector distance — lower is closer">
+          {chunk.dense_score !== null ? `dist ${chunk.dense_score.toFixed(3)}` : "—"}
         </span>
       </div>
       {width !== null && (

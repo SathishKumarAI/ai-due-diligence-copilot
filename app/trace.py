@@ -50,6 +50,8 @@ class RetrievedChunkTrace:
     page: int | None
     extraction_method: str
     chars: int
+    # Chroma's vector score is an L2 *distance*: SMALLER = more similar. Named
+    # dense_score for the API, but interpret lower as closer (the UI bars do).
     dense_score: float | None
     snippet: str
 
@@ -85,10 +87,10 @@ def tokenize_trace(text: str) -> TokenizationTrace:
 
 
 def dense_scores(vectorstore: VectorStore, query: str, k: int) -> dict[tuple, float]:
-    """Best-effort map of chunk-key -> dense similarity score.
+    """Best-effort map of chunk-key -> dense vector **distance** (lower = closer).
 
-    Uses the store's scored search when available (Chroma supports it). Returns an
-    empty map for stores/fakes that don't, so the trace degrades gracefully.
+    Uses the store's scored search when available (Chroma returns an L2 distance).
+    Returns an empty map for stores/fakes that don't, so the trace degrades gracefully.
     """
     try:
         pairs = vectorstore.similarity_search_with_score(query, k=k)

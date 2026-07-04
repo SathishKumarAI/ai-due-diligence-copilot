@@ -174,7 +174,9 @@ class RagEngine:
             )
 
         context = _format_context(docs)
-        messages = self._build_messages(question, context)
+        # Generate from the condensed standalone query so follow-ups whose phrasing
+        # depends on history ("what about their revenue?") are self-contained for the LLM.
+        messages = self._build_messages(query, context)
 
         t1 = time.perf_counter()
         response = self.llm.invoke(messages)
@@ -244,7 +246,9 @@ class RagEngine:
             return ans, tr
 
         context = _format_context(docs)
-        messages = self._build_messages(question, context)
+        # Generate from the condensed standalone query so follow-ups whose phrasing
+        # depends on history ("what about their revenue?") are self-contained for the LLM.
+        messages = self._build_messages(query, context)
 
         t1 = time.perf_counter()
         response = self.llm.invoke(messages)
@@ -287,7 +291,7 @@ class RagEngine:
             yield ("token", "The provided documents do not cover this.")
             yield ("citations", [])
             return
-        messages = self._build_messages(question, _format_context(docs))
+        messages = self._build_messages(query, _format_context(docs))
         collected = []
         for chunk in self.llm.stream(messages):
             piece = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
