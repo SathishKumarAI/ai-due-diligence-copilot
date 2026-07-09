@@ -1,0 +1,31 @@
+# GPU overlay for docker-compose.yml. Gives the API and Ollama the host NVIDIA GPU and
+# builds the CUDA app image. Requires the NVIDIA Container Toolkit.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+#   docker compose exec ollama ollama pull llama3.1:8b   # one-time
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    environment:
+      EMBED_DEVICE: cuda
+      RERANK_DEVICE: cuda
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  ollama:
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

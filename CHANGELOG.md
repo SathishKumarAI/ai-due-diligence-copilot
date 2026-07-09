@@ -9,6 +9,12 @@ The same notes, in plain language, are published as
 
 ## [Unreleased]
 ### Added
+- **GPU + no-Docker deployment.** New-device setup now has two paths (Docker / native)
+  each in CPU or GPU mode, on Windows/RTX, Linux, and macOS. Added `Dockerfile.gpu`
+  (CUDA 12.4 + torch cu124 + OCR stack), `docker-compose.gpu.yml` (reserves the GPU for
+  API + Ollama), `scripts/setup.sh` / `scripts/setup.ps1` native bootstrappers,
+  `.dockerignore`, and `docs/DEPLOYMENT.md`. Embeddings and the F17 reranker now honor
+  `EMBED_DEVICE` / `RERANK_DEVICE` (`auto` = cuda→mps→cpu) via new `app/device.py`.
 - `scripts/generate_synthetic_data.py` — reproducible generator for the synthetic
   deal-document corpus (seedable; no LLM/network).
 - **F16 — Hybrid retrieval.** Lexical BM25 (dependency-free, in-process) fused with

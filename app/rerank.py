@@ -29,15 +29,19 @@ class NoOpReranker:
 class CrossEncoderReranker:
     """Re-score with a sentence-transformers CrossEncoder. Model loaded lazily."""
 
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, device: str = "auto") -> None:
         self.model_name = model_name
+        self.device = device
         self._model = None
 
     def _ensure_model(self):  # noqa: ANN202
         if self._model is None:
             from sentence_transformers import CrossEncoder
 
-            self._model = CrossEncoder(self.model_name)
+            from app.device import resolve_device
+
+            # device: "auto" picks cuda -> mps -> cpu (see app/device.py / RERANK_DEVICE).
+            self._model = CrossEncoder(self.model_name, device=resolve_device(self.device))
         return self._model
 
     def rerank(self, query: str, docs: list[Document], top_n: int) -> list[Document]:
@@ -52,5 +56,5 @@ class CrossEncoderReranker:
 def build_reranker(settings) -> Reranker:  # noqa: ANN001
     """Real cross-encoder when enabled, otherwise the no-op (F17)."""
     if settings.rerank_enabled:
-        return CrossEncoderReranker(settings.rerank_model)
+        return CrossEncoderReranker(settings.rerank_model, settings.rerank_device)
     return NoOpReranker()

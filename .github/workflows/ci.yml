@@ -28,5 +28,7 @@ jobs:
     needs: quality
     steps:
       - uses: actions/checkout@v4
-      - name: Build image
+      - name: Build CPU image
         run: docker build -t ai-due-diligence-copilot:ci .
+      - name: Build GPU image (build only; no GPU needed to build)
+        run: docker build -f Dockerfile.gpu -t ai-due-diligence-copilot:ci-gpu .

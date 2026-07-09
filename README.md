@@ -92,6 +92,25 @@ curl -s localhost:8000/v1/ask -H 'content-type: application/json' \
 > Tesseract (UB-Mannheim) + Poppler and add them to PATH for OCR. Full walkthrough:
 > [`docs/INGESTION.md`](docs/INGESTION.md).
 
+## Run it on a new device
+
+Two independent paths — **Docker** or **native (no Docker)** — each in **CPU** or **GPU**
+mode, on **Windows/RTX, Linux, or macOS**. Full matrix + walkthroughs in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+```bash
+# Native, no Docker — one command bootstraps a venv + deps
+./scripts/setup.sh            # Linux/macOS (CPU)      | --gpu for CUDA torch
+.\scripts\setup.ps1 -Gpu      # Windows/RTX (CUDA)     | omit -Gpu for CPU
+
+# Docker
+docker compose up --build                                             # CPU (default)
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build   # GPU (NVIDIA)
+```
+
+GPU is opt-in: set `EMBED_DEVICE` / `RERANK_DEVICE` to `auto` (cuda→mps→cpu), or force
+`cuda` / `cpu` / `mps`. The GPU compose overlay sets them to `cuda` automatically.
+
 ## Quick start (frontend)
 
 ```bash
@@ -106,7 +125,8 @@ make test       # offline tests (fake provider, no network)
 make lint       # ruff
 make typecheck  # mypy
 make eval       # retrieval hit-rate + faithfulness (needs a provider)
-make docker     # api + ollama via docker compose
+make docker     # api + ollama via docker compose (CPU)
+make docker-gpu # api + ollama with NVIDIA GPU (compose GPU overlay)
 ```
 
 ## Disclaimer

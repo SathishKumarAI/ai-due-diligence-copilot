@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     ollama_llm_model: str = "llama3.1:8b"
     hf_embed_model: str = "BAAI/bge-small-en-v1.5"
 
+    # --- compute device for embeddings / reranker (local path) ---
+    # "auto" (cuda -> mps -> cpu), or force "cpu" | "cuda" | "mps". See app/device.py.
+    embed_device: str = "auto"
+    rerank_device: str = "auto"
+
     # --- Claude + Voyage ---
     anthropic_api_key: str = ""
     voyage_api_key: str = ""

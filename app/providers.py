@@ -15,8 +15,14 @@ def get_embeddings(settings: Settings) -> Embeddings:
     if settings.provider == "ollama":
         from langchain_huggingface import HuggingFaceEmbeddings
 
+        from app.device import resolve_device
+
         # Local sentence-transformers model; downloads once, then runs offline.
-        return HuggingFaceEmbeddings(model_name=settings.hf_embed_model)
+        # device: "auto" picks cuda -> mps -> cpu (see app/device.py / EMBED_DEVICE).
+        return HuggingFaceEmbeddings(
+            model_name=settings.hf_embed_model,
+            model_kwargs={"device": resolve_device(settings.embed_device)},
+        )
 
     if settings.provider == "claude":
         from langchain_voyageai import VoyageAIEmbeddings

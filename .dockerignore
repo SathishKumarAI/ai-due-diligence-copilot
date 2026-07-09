@@ -1,0 +1,19 @@
+# Keep the build context small — the image copies only app/ and data/.
+.git
+.github
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.cache
+chroma_db
+web/node_modules
+web/.next
+tests
+eval
+docs
+*.md
+.env

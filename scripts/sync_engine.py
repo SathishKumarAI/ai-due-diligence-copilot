@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SHARED_ENGINE_FILES: list[str] = [
     "app/cache.py",
     "app/cleaning.py",
+    "app/device.py",
     "app/feedback.py",
     "app/ingest.py",
     "app/main.py",

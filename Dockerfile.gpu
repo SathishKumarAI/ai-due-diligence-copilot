@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+# GPU image: CUDA runtime base + Python 3.12 + CUDA torch wheels + OCR native stack.
+# The CPU image is the default (`Dockerfile`); use this one via the compose override:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+# Requires the NVIDIA Container Toolkit on the host.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DEBIAN_FRONTEND=noninteractive
+
+# Python 3.12 (deadsnakes) + OCR native engines (Tesseract + Poppler, feature F20).
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+ && add-apt-repository -y ppa:deadsnakes/ppa \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      python3.12 python3.12-venv python3.12-dev \
+      tesseract-ocr poppler-utils ca-certificates \
+ && python3.12 -m ensurepip --upgrade \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# CUDA-enabled torch first (cu124 wheel index); sentence-transformers then reuses it
+# instead of pulling the CPU build.
+COPY requirements.txt .
+RUN python3.12 -m pip install --no-cache-dir --upgrade pip \
+ && python3.12 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124 \
+ && python3.12 -m pip install --no-cache-dir -r requirements.txt
+
+RUN useradd --create-home --uid 10001 appuser
+COPY app/ ./app/
+COPY data/ ./data/
+USER appuser
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s \
+  CMD python3.12 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
+CMD ["python3.12", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
