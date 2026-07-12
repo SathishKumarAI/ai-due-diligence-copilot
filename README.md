@@ -70,7 +70,9 @@ curl -s localhost:8000/v1/ask -H 'content-type: application/json' \
   -d '{"question":"What are the main risks for this company?"}'
 ```
 
-Use Claude instead: set `PROVIDER=claude`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
+Runs **fully local** by default — `LOCAL_ONLY=true` refuses the cloud path even if
+`PROVIDER=claude`. To deliberately use Claude, set `LOCAL_ONLY=false`, `PROVIDER=claude`,
+`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
 
 **OCR + real corpus (optional):**
 

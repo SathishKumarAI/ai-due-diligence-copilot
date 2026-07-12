@@ -101,9 +101,11 @@ source .venv/bin/activate && python -m app.ingest && make run
 
 ## Cloud provider (no local GPU)
 
-Skip Ollama/torch entirely — use Claude + Voyage. Set in `.env`:
+Skip Ollama/torch entirely — use Claude + Voyage. The cloud path is gated: by default
+`LOCAL_ONLY=true` refuses it, so you must opt in. Set in `.env`:
 
 ```
+LOCAL_ONLY=false
 PROVIDER=claude
 ANTHROPIC_API_KEY=...
 VOYAGE_API_KEY=...

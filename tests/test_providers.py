@@ -14,8 +14,19 @@ def test_get_llm_ollama():
 def test_get_llm_claude():
     from langchain_anthropic import ChatAnthropic
 
-    llm = get_llm(Settings(provider="claude", anthropic_api_key="test-key"))
+    # Cloud path is gated by LOCAL_ONLY; opt in explicitly to exercise it.
+    llm = get_llm(Settings(provider="claude", anthropic_api_key="test-key", local_only=False))
     assert isinstance(llm, ChatAnthropic)
+
+
+def test_claude_blocked_when_local_only():
+    # Default LOCAL_ONLY=true must refuse the cloud provider for both LLM and embeddings.
+    s = Settings(provider="claude", anthropic_api_key="test-key")
+    assert s.local_only is True
+    with pytest.raises(RuntimeError):
+        get_llm(s)
+    with pytest.raises(RuntimeError):
+        get_embeddings(s)
 
 
 def test_unknown_provider_raises():

@@ -11,6 +11,15 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from app.config import Settings
 
 
+def _ensure_cloud_allowed(settings: Settings) -> None:
+    """Refuse the cloud provider when running fully local (LOCAL_ONLY)."""
+    if settings.local_only:
+        raise RuntimeError(
+            "LOCAL_ONLY is enabled: the Claude/Voyage cloud provider is disabled. "
+            "Set LOCAL_ONLY=false to use PROVIDER=claude."
+        )
+
+
 def get_embeddings(settings: Settings) -> Embeddings:
     if settings.provider == "ollama":
         from langchain_huggingface import HuggingFaceEmbeddings
@@ -25,6 +34,7 @@ def get_embeddings(settings: Settings) -> Embeddings:
         )
 
     if settings.provider == "claude":
+        _ensure_cloud_allowed(settings)
         from langchain_voyageai import VoyageAIEmbeddings
 
         return VoyageAIEmbeddings(
@@ -47,6 +57,7 @@ def get_llm(settings: Settings) -> BaseChatModel:
         )
 
     if settings.provider == "claude":
+        _ensure_cloud_allowed(settings)
         from langchain_anthropic import ChatAnthropic
 
         return ChatAnthropic(

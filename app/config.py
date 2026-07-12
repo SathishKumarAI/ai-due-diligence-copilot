@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
     # --- provider selection ---
     provider: Literal["ollama", "claude"] = "ollama"
+    # Fully-local guard: when true (default), the Claude/Voyage cloud provider is refused
+    # even if PROVIDER=claude. Set LOCAL_ONLY=false to allow the cloud path.
+    local_only: bool = True
 
     # --- open-source (Ollama + HuggingFace) ---
     ollama_base_url: str = "http://localhost:11434"

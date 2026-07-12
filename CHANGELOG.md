@@ -9,6 +9,9 @@ The same notes, in plain language, are published as
 
 ## [Unreleased]
 ### Added
+- **Fully-local guard (`LOCAL_ONLY`).** Runs local-only by default: `LOCAL_ONLY=true`
+  refuses the Claude/Voyage cloud provider even if `PROVIDER=claude`. Set `LOCAL_ONLY=false`
+  to opt into the cloud path. Enforced at the provider seam (`app/providers.py`).
 - **GPU + no-Docker deployment.** New-device setup now has two paths (Docker / native)
   each in CPU or GPU mode, on Windows/RTX, Linux, and macOS. Added `Dockerfile.gpu`
   (CUDA 12.4 + torch cu124 + OCR stack), `docker-compose.gpu.yml` (reserves the GPU for
