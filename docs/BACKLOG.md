@@ -49,3 +49,25 @@ sidebar_position: 2
 | Auth via API gateway / SSO | when multi-tenant |
 
 > When a P2 item gets picked up, write its spec in `specs/` **before** coding.
+## Roadmap (khanban-managed)
+
+Future work the board tracks as Backlog cards. Shipped features are in the tables above;
+edit future items only inside the markers below.
+
+<!-- khanban:start -->
+- [x] GPU acceleration (CUDA torch for embeddings + reranker) (done 2026-07-09)
+- [x] Docker-optional native setup for any device (Win/RTX, Linux, macOS) (done 2026-07-09)
+- [x] Per-domain UI accent color (done 2026-07-09)
+- [x] Fully-local guard (LOCAL_ONLY refuses cloud by default) (done 2026-07-12)
+- [ ] Run full app + eval on the Windows/RTX GPU host (verify end-to-end)
+- [ ] Add quantized low-VRAM model presets (fit smaller GPUs)
+- [ ] Incremental re-ingest — only re-embed changed documents
+- [ ] Promote thumbs up/down feedback into the eval set automatically
+- [ ] Bulk folder upload (ingest many documents in one action)
+- [ ] Server-side conversation persistence (resume threads across devices)
+- [ ] Answer-quality regression gate in CI (fail on eval-score drop)
+- [ ] Observability dashboards + alert rules (Grafana/Prometheus)
+- [ ] Multi-tenant auth via API gateway / SSO
+- [ ] Extract financial tables from 10-Ks (structured figures)
+- [ ] XBRL fact parsing for exact reported numbers
+<!-- khanban:end -->
