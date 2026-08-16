@@ -1,0 +1,22 @@
+# Resolver constraints applied when compiling requirements.lock / requirements-dev.lock.
+# Not installed directly — see docs/DEPLOYMENT.md.
+#
+# torch is not a direct dependency; it arrives transitively through
+# sentence-transformers, and pip would otherwise resolve it to the newest release on
+# PyPI. That breaks the GPU path in a way that is silent and easy to miss:
+#
+#   - the setup scripts install a CUDA build first, from the cu128 wheel index
+#   - installing the lock afterwards finds a *different* torch version pinned
+#   - pip replaces the working CUDA build with the CPU build from PyPI
+#   - torch.cuda.is_available() goes False, and the only symptom is that everything
+#     got slower
+#
+# Measured 2026-08-16: https://download.pytorch.org/whl/cu128/torch/ publishes
+# cp312/win_amd64 wheels up to 2.11.0, while an unconstrained resolve chose 2.13.0.
+# Capping below 2.12 keeps the locked version one the CUDA index can actually serve, so
+# CPU and GPU installs run the same torch version and differ only in build.
+#
+# Raise this ceiling when the cu128 index publishes a newer wheel, and re-run:
+#   uv pip compile requirements.txt     -c constraints.txt -o requirements.lock
+#   uv pip compile requirements-dev.txt -c constraints.txt -o requirements-dev.lock
+torch<2.12

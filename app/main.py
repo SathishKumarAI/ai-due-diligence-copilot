@@ -119,7 +119,12 @@ def ready() -> schemas.ReadyResponse:
             n = engine.vectorstore._collection.count()  # type: ignore[attr-defined]
         except Exception:  # noqa: BLE001
             n = -1
-    return schemas.ReadyResponse(ready=engine is not None and n != 0, indexed_chunks=n)
+    # -1 means the collection could not be counted at all — which happens for real: a
+    # re-ingest while the API is serving resets the collection under the process, and it
+    # keeps a handle that can no longer answer. Reporting ready=true alongside
+    # indexed_chunks=-1 tells an orchestrator to keep sending traffic to an instance that
+    # has lost its index, so a probe that cannot see its collection is not ready.
+    return schemas.ReadyResponse(ready=engine is not None and n > 0, indexed_chunks=n)
 
 
 @app.get("/metrics", tags=["ops"])

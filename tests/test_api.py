@@ -52,3 +52,21 @@ def test_auth_required_when_api_key_set(monkeypatch, fake_engine):
         ok = c.post("/v1/ask", json={"question": "ARR?"}, headers={"X-API-Key": "secret"})
         assert ok.status_code == 200
     main.app.dependency_overrides.clear()
+
+
+def test_ready_is_not_ready_when_the_collection_cannot_be_counted(client, monkeypatch):
+    # A re-ingest while the API is serving leaves it holding a stale Chroma handle: the
+    # count raises, the endpoint returns the -1 sentinel, and reporting ready=true there
+    # keeps an orchestrator routing traffic to an instance that has lost its index.
+    import app.main as main
+
+    class Dead:
+        def count(self):
+            raise RuntimeError("collection reset underneath us")
+
+    monkeypatch.setattr(
+        type(main.app.state.engine.vectorstore), "_collection", Dead(), raising=False
+    )
+    body = client.get("/ready").json()
+    assert body["indexed_chunks"] == -1
+    assert body["ready"] is False

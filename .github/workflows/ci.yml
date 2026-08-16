@@ -13,19 +13,65 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements-dev.txt
+
+      # From the lock, not the ranges. Every drift that broke this gate between July and
+      # August 2026 — a ruff formatter that reformatted 14 files, a numpy whose stubs
+      # mypy refused, langchain provider kwargs that moved — came in through an
+      # unpinned range resolving differently than it had on the author's machine.
+      - name: Install (locked)
+        run: pip install -r requirements-dev.lock
+
+      # The lock must be a faithful compile of the ranges. Editing requirements.txt and
+      # forgetting scripts/lock.sh would otherwise ship a lock that no longer matches
+      # what the project says it depends on.
+      - name: Lockfile is up to date
+        run: |
+          pipx run uv pip compile requirements.txt     -c constraints.txt -o /tmp/req.lock --quiet
+          pipx run uv pip compile requirements-dev.txt -c constraints.txt -o /tmp/dev.lock --quiet
+          diff -u requirements.lock /tmp/req.lock \
+            || { echo "::error::requirements.lock is stale - run scripts/lock.sh"; exit 1; }
+          diff -u requirements-dev.lock /tmp/dev.lock \
+            || { echo "::error::requirements-dev.lock is stale - run scripts/lock.sh"; exit 1; }
+
+      # eval/ and scripts/ were outside the gate, which is part of why the eval harness
+      # shipped unable to import app/, and the corpus fetcher shipped exiting 0 on a
+      # fetch that downloaded nothing.
       - name: Lint
-        run: ruff check app tests
+        run: ruff check app tests eval scripts
       - name: Format check
-        run: ruff format --check app tests
+        run: ruff format --check app tests eval scripts
       - name: Type check
         run: mypy app
       - name: Tests (offline, fake provider)
         run: pytest
 
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: web
+      # The frontend had no CI at all, which is how a CRLF SSE bug that stopped the chat
+      # rendering any answer shipped and stayed unnoticed.
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: web
+      - name: Tests
+        run: npm test
+        working-directory: web
+      - name: Build
+        run: npm run build
+        working-directory: web
+
   docker:
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality, web]
     steps:
       - uses: actions/checkout@v4
       - name: Build CPU image
