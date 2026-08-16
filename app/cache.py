@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 
 from langchain.embeddings import CacheBackedEmbeddings
@@ -22,13 +23,30 @@ from langchain_core.embeddings import Embeddings
 from app.config import Settings
 
 
+def embedding_namespace(settings: Settings) -> str:
+    """Filesystem-safe cache namespace for the *active* provider's embedding model.
+
+    CacheBackedEmbeddings prefixes every key with this string and LocalFileStore turns
+    the result into a path, validating it against ``^[a-zA-Z0-9_.\\-/]+$``. The obvious
+    spelling -- "{provider}:{hf_model}:{voyage_model}" -- fails on the colons, so every
+    ingest died with InvalidKeyException before writing a single vector. A "/" would
+    have passed that check but silently nested a "BAAI/" directory, so it goes too.
+
+    Only the active provider's model is included: switching providers must land in a
+    different namespace, and the idle provider's model name has no business in the key.
+    """
+    model = settings.voyage_model if settings.provider == "claude" else settings.hf_embed_model
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", f"{settings.provider}-{model}") + "-"
+
+
 def wrap_embeddings(embeddings: Embeddings, settings: Settings) -> Embeddings:
     """Return embeddings with a persistent cache in front, if enabled."""
     if not settings.cache_enabled:
         return embeddings
     store = LocalFileStore(str(settings.cache_dir / "embeddings"))
-    namespace = f"{settings.provider}:{settings.hf_embed_model}:{settings.voyage_model}"
-    return CacheBackedEmbeddings.from_bytes_store(embeddings, store, namespace=namespace)
+    return CacheBackedEmbeddings.from_bytes_store(
+        embeddings, store, namespace=embedding_namespace(settings)
+    )
 
 
 class AnswerCache:
