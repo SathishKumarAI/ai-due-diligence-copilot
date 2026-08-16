@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { askExplain, askStream, type Citation, type PipelineTrace, type Turn } from "@/lib/api";
+import {
+  askExplain,
+  askStream,
+  type Citation,
+  type GroundingReport,
+  type PipelineTrace,
+  type Turn,
+} from "@/lib/api";
 import { siteConfig } from "@/lib/config";
 import { AnswerText } from "./AnswerText";
 import { CitationList } from "./CitationList";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { GroundingPanel } from "./GroundingPanel";
 import { TracePanel } from "./TracePanel";
 
 type Message = {
@@ -22,6 +30,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [traces, setTraces] = useState<Record<number, PipelineTrace | "loading" | "error">>({});
+  const [groundings, setGroundings] = useState<Record<number, GroundingReport>>({});
   const bottom = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
@@ -53,6 +62,10 @@ export function Chat() {
     try {
       const res = await askExplain(question, history);
       setTraces((t) => ({ ...t, [assistantId]: res.trace ?? "error" }));
+      // F24 travels with the same re-ask; absent only if the backend predates it.
+      if (res.grounding) {
+        setGroundings((g) => ({ ...g, [assistantId]: res.grounding as GroundingReport }));
+      }
     } catch {
       setTraces((t) => ({ ...t, [assistantId]: "error" }));
     }
@@ -159,6 +172,9 @@ export function Chat() {
                               <p className="mt-2 text-xs text-red-500">
                                 Could not load the trace. Is the backend running?
                               </p>
+                            )}
+                            {groundings[m.id] && (
+                              <GroundingPanel report={groundings[m.id]} />
                             )}
                             {traces[m.id] && traces[m.id] !== "loading" && traces[m.id] !== "error" && (
                               <TracePanel trace={traces[m.id] as PipelineTrace} />
