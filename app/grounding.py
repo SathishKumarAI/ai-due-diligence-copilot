@@ -16,10 +16,11 @@ Design notes:
 - **It reuses ``retrieval._tokenize``**, deliberately. That tokenizer keeps ``$12.4m``
   and ``39%`` whole, so a figure in a claim is compared as a figure rather than
   decomposed into a bare number that would match any digit in the source.
-- **Figures are checked separately and harder than prose.** In a due-diligence answer
-  the dangerous failure is not clumsy wording, it is a number that appears nowhere in
-  the filing. Any token containing a digit that is absent from the cited chunk marks
-  the claim unsupported regardless of how well the surrounding words match.
+- **Figures are checked separately and harder than prose.** Across every domain this
+  engine serves, the dangerous failure is not clumsy wording but a number that appears
+  in no source document — a revenue figure, a dose, a timeout. Any token containing a
+  digit that is absent from the cited chunk marks the claim unsupported regardless of
+  how well the surrounding words match.
 
 This is a lexical grounding check, not an entailment model: it answers "is this claim's
 material present in the source it cites", not "does the source logically entail it". A
