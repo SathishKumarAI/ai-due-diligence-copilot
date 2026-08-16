@@ -52,8 +52,11 @@ def sha256(path: Path) -> str:
 
 
 def write_manifest(repo: Path) -> None:
+    # newline="\n" explicitly: Path.write_text translates to CRLF on Windows, and this
+    # file is regenerated on whichever platform the author happens to be using. Same
+    # class of defect as the TSV export in scripts/export_embeddings.py.
     lines = [f"{sha256(repo / rel)}  {rel}" for rel in SHARED_ENGINE_FILES]
-    (repo / MANIFEST_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (repo / MANIFEST_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def copy_to(target: Path) -> list[str]:
