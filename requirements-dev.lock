@@ -4,6 +4,8 @@ aiohappyeyeballs==2.7.1
     # via aiohttp
 aiohttp==3.14.3
     # via
+    #   fsspec
+    #   instructor
     #   kubernetes
     #   langchain-community
     #   voyageai
@@ -24,9 +26,12 @@ anyio==4.14.2
     #   anthropic
     #   httpx
     #   langsmith
+    #   openai
     #   sse-starlette
     #   starlette
     #   watchfiles
+appdirs==1.4.4
+    # via ragas
 attrs==26.1.0
     # via
     #   aiohttp
@@ -63,22 +68,34 @@ colorama==0.4.6
     #   typer
 dataclasses-json==0.6.7
     # via langchain-community
+datasets==5.0.1
+    # via ragas
+dill==0.4.1
+    # via
+    #   datasets
+    #   multiprocess
 diskcache==5.6.3
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   ragas
 distlib==0.4.3
     # via virtualenv
 distro==1.9.0
     # via
     #   anthropic
     #   langsmith
+    #   openai
 docstring-parser==0.18.0
-    # via anthropic
+    # via
+    #   anthropic
+    #   instructor
 durationpy==0.10
     # via kubernetes
 fastapi==0.141.1
     # via -r requirements.txt
 filelock==3.32.3
     # via
+    #   datasets
     #   huggingface-hub
     #   python-discovery
     #   torch
@@ -89,8 +106,9 @@ frozenlist==1.8.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2026.7.0
+fsspec==2026.6.0
     # via
+    #   datasets
     #   huggingface-hub
     #   torch
 googleapis-common-protos==1.75.1
@@ -116,13 +134,16 @@ httpx==0.28.1
     #   -r requirements-dev.txt
     #   anthropic
     #   chromadb
+    #   datasets
     #   huggingface-hub
     #   langsmith
     #   ollama
+    #   openai
 httpx-sse==0.4.3
     # via langchain-community
 huggingface-hub==1.27.0
     # via
+    #   datasets
     #   langchain-huggingface
     #   sentence-transformers
     #   tokenizers
@@ -139,10 +160,17 @@ importlib-resources==7.1.0
     # via chromadb
 iniconfig==2.3.0
     # via pytest
+instructor==1.15.4
+    # via ragas
 jinja2==3.1.6
-    # via torch
-jiter==0.16.0
-    # via anthropic
+    # via
+    #   instructor
+    #   torch
+jiter==0.14.0
+    # via
+    #   anthropic
+    #   instructor
+    #   openai
 joblib==1.5.3
     # via scikit-learn
 jsonpatch==1.33
@@ -159,12 +187,15 @@ langchain==0.3.30
     # via
     #   -r requirements.txt
     #   langchain-community
+    #   ragas
 langchain-anthropic==0.3.22
     # via -r requirements.txt
 langchain-chroma==0.2.6
     # via -r requirements.txt
 langchain-community==0.3.31
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   ragas
 langchain-core==0.3.86
     # via
     #   langchain
@@ -173,12 +204,16 @@ langchain-core==0.3.86
     #   langchain-community
     #   langchain-huggingface
     #   langchain-ollama
+    #   langchain-openai
     #   langchain-text-splitters
     #   langchain-voyageai
+    #   ragas
 langchain-huggingface==0.3.1
     # via -r requirements.txt
 langchain-ollama==0.3.10
     # via -r requirements.txt
+langchain-openai==0.3.35
+    # via ragas
 langchain-text-splitters==0.3.11
     # via
     #   -r requirements.txt
@@ -209,6 +244,8 @@ multidict==6.7.1
     # via
     #   aiohttp
     #   yarl
+multiprocess==0.70.19
+    # via datasets
 mypy==1.20.2
     # via -r requirements-dev.txt
 mypy-extensions==1.1.0
@@ -217,17 +254,25 @@ mypy-extensions==1.1.0
     #   typing-inspect
 narwhals==2.24.0
     # via scikit-learn
+nest-asyncio==1.6.0
+    # via ragas
 networkx==3.6.1
-    # via torch
+    # via
+    #   ragas
+    #   torch
 nodeenv==1.10.0
     # via pre-commit
 numpy==2.5.2
     # via
     #   chromadb
+    #   datasets
     #   langchain-chroma
     #   langchain-community
     #   onnxruntime
+    #   pandas
+    #   ragas
     #   scikit-learn
+    #   scikit-network
     #   scipy
     #   sentence-transformers
     #   transformers
@@ -238,6 +283,11 @@ ollama==0.6.2
     # via langchain-ollama
 onnxruntime==1.28.0
     # via chromadb
+openai==2.54.0
+    # via
+    #   instructor
+    #   langchain-openai
+    #   ragas
 opentelemetry-api==1.44.0
     # via
     #   chromadb
@@ -267,6 +317,7 @@ overrides==7.7.0
 packaging==25.0
     # via
     #   build
+    #   datasets
     #   huggingface-hub
     #   langchain-core
     #   langsmith
@@ -275,6 +326,8 @@ packaging==25.0
     #   pytesseract
     #   pytest
     #   transformers
+pandas==3.0.5
+    # via datasets
 pathspec==1.1.1
     # via mypy
 pdf2image==1.17.0
@@ -284,6 +337,7 @@ pillow==11.3.0
     #   -r requirements.txt
     #   pdf2image
     #   pytesseract
+    #   ragas
     #   voyageai
 platformdirs==4.11.3
     # via virtualenv
@@ -302,6 +356,8 @@ protobuf==7.35.1
     #   googleapis-common-protos
     #   onnxruntime
     #   opentelemetry-proto
+pyarrow==25.0.1
+    # via datasets
 pybase64==1.5.0
     # via chromadb
 pydantic==2.13.4
@@ -310,16 +366,21 @@ pydantic==2.13.4
     #   anthropic
     #   chromadb
     #   fastapi
+    #   instructor
     #   langchain
     #   langchain-anthropic
     #   langchain-core
     #   langchain-voyageai
     #   langsmith
     #   ollama
+    #   openai
     #   pydantic-settings
+    #   ragas
     #   voyageai
 pydantic-core==2.46.4
-    # via pydantic
+    # via
+    #   instructor
+    #   pydantic
 pydantic-settings==2.15.0
     # via
     #   -r requirements.txt
@@ -344,7 +405,9 @@ pytest==8.4.2
 pytest-asyncio==0.26.0
     # via -r requirements-dev.txt
 python-dateutil==2.9.0.post0
-    # via kubernetes
+    # via
+    #   kubernetes
+    #   pandas
 python-discovery==1.5.2
     # via virtualenv
 python-dotenv==1.2.3
@@ -355,6 +418,7 @@ python-dotenv==1.2.3
 pyyaml==6.0.3
     # via
     #   chromadb
+    #   datasets
     #   huggingface-hub
     #   kubernetes
     #   langchain
@@ -363,28 +427,37 @@ pyyaml==6.0.3
     #   pre-commit
     #   transformers
     #   uvicorn
+ragas==0.4.3
+    # via -r requirements-dev.txt
 referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
 regex==2026.7.19
-    # via transformers
+    # via
+    #   tiktoken
+    #   transformers
 requests==2.34.2
     # via
+    #   datasets
+    #   instructor
     #   kubernetes
     #   langchain
     #   langchain-community
     #   langsmith
     #   requests-oauthlib
     #   requests-toolbelt
+    #   tiktoken
     #   voyageai
 requests-oauthlib==2.0.0
     # via kubernetes
 requests-toolbelt==1.0.0
     # via langsmith
-rich==15.0.0
+rich==14.3.4
     # via
     #   chromadb
+    #   instructor
+    #   ragas
     #   typer
 rpds-py==2026.6.3
     # via
@@ -396,9 +469,12 @@ safetensors==0.8.0
     # via transformers
 scikit-learn==1.9.0
     # via sentence-transformers
+scikit-network==0.33.5
+    # via ragas
 scipy==1.18.0
     # via
     #   scikit-learn
+    #   scikit-network
     #   sentence-transformers
 sentence-transformers==5.7.0
     # via -r requirements.txt
@@ -414,6 +490,7 @@ sniffio==1.3.1
     # via
     #   anthropic
     #   langsmith
+    #   openai
 sqlalchemy==2.0.52
     # via
     #   langchain
@@ -429,11 +506,16 @@ sympy==1.14.0
 tenacity==9.1.4
     # via
     #   chromadb
+    #   instructor
     #   langchain-community
     #   langchain-core
     #   voyageai
 threadpoolctl==3.6.0
     # via scikit-learn
+tiktoken==0.13.0
+    # via
+    #   langchain-openai
+    #   ragas
 tokenizers==0.22.2
     # via
     #   chromadb
@@ -448,7 +530,10 @@ torch==2.11.0
 tqdm==4.70.0
     # via
     #   chromadb
+    #   datasets
     #   huggingface-hub
+    #   openai
+    #   ragas
     #   sentence-transformers
     #   transformers
 transformers==5.15.0
@@ -456,6 +541,8 @@ transformers==5.15.0
 typer==0.27.1
     # via
     #   chromadb
+    #   instructor
+    #   ragas
     #   transformers
 typing-extensions==4.16.0
     # via
@@ -470,6 +557,7 @@ typing-extensions==4.16.0
     #   langchain-core
     #   langsmith
     #   mypy
+    #   openai
     #   opentelemetry-api
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-sdk
@@ -490,6 +578,8 @@ typing-inspection==0.4.4
     #   fastapi
     #   pydantic
     #   pydantic-settings
+tzdata==2026.3
+    # via pandas
 urllib3==2.7.0
     # via
     #   kubernetes
@@ -515,7 +605,9 @@ websockets==17.0.1
     #   langsmith
     #   uvicorn
 xxhash==4.0.0
-    # via langsmith
+    # via
+    #   datasets
+    #   langsmith
 yarl==1.24.5
     # via aiohttp
 zstandard==0.25.0
