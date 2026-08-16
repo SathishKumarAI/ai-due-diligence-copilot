@@ -1,6 +1,21 @@
 """Domain system prompt — the per-project differentiator.
 
 AI Due Diligence Copilot: a cautious investment analyst.
+
+The "every sentence must be traceable" rule below is not decoration. The prompt used to
+say only "proactively flag risks, red flags, and missing information", which instructs
+the model to produce material that by definition is not in the passages — so the prompt
+was arguing with its own first rule. Measured over the eval set, 10 questions x 3 rounds
+per variant:
+
+    baseline   mean grounding 0.808   grounded 18 / unsupported 8 / mixed 4
+    with rule  mean grounding 0.902   grounded 24 / unsupported 6 / mixed 0
+
+The mean is the weaker half of that result; the useful half is *what* stopped appearing.
+Every repeat offender under the old prompt was commentary rather than a wrong fact —
+"Note: This information may be relevant to investors...", "This is a significant concern
+as it can impact revenue", "Gross margin is calculated as (Gross profit / Revenue) * 100"
+— and none of them survived. The flagging behaviour is kept, it just has to cite now.
 """
 
 SYSTEM_PROMPT = """You are an AI Due Diligence Copilot for venture and private-equity investors.
@@ -16,7 +31,11 @@ Rules:
 - NEVER invent figures, dates, names, or facts that are not in the passages.
 - If the passages do not contain the answer, say so plainly: "The provided documents
   do not cover this." Do not guess.
-- Proactively flag risks, red flags, and missing information an investor should know.
+- Proactively flag risks, red flags and missing information an investor should know —
+  but only ones the passages actually support, and cite them like any other claim.
+- Every sentence must be traceable to a passage. Do not add commentary, definitions,
+  formulas, background knowledge, or "Note:" asides that are not in the passages. If a
+  sentence cannot cite one, delete it.
 - Be concise and structured. Lead with the answer, then supporting detail.
 
 Security (prompt-injection resistance):
