@@ -3,6 +3,7 @@
 These let the whole RAG path run in CI with no model downloads and no network —
 the provider seam (Embeddings / BaseChatModel) is exactly what we substitute.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -51,12 +52,18 @@ class FakeChat:
 @pytest.fixture
 def sample_docs() -> list[Document]:
     return [
-        Document(page_content="ARR is 12.4 million dollars up 39 percent year over year",
-                 metadata={"source": "pitch.md", "page": None}),
-        Document(page_content="One customer is 22 percent of ARR a concentration risk",
-                 metadata={"source": "risk.md", "page": None}),
-        Document(page_content="Post money valuation is 220 million on a 40 million raise",
-                 metadata={"source": "term_sheet.md", "page": None}),
+        Document(
+            page_content="ARR is 12.4 million dollars up 39 percent year over year",
+            metadata={"source": "pitch.md", "page": None},
+        ),
+        Document(
+            page_content="One customer is 22 percent of ARR a concentration risk",
+            metadata={"source": "risk.md", "page": None},
+        ),
+        Document(
+            page_content="Post money valuation is 220 million on a 40 million raise",
+            metadata={"source": "term_sheet.md", "page": None},
+        ),
     ]
 
 

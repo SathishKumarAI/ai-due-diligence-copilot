@@ -62,9 +62,7 @@ class CleanReport:
         return self.chars_before - self.chars_after
 
 
-def clean_text(
-    text: str, config: CleaningConfig = DEFAULT_CLEANING
-) -> tuple[str, CleanReport]:
+def clean_text(text: str, config: CleaningConfig = DEFAULT_CLEANING) -> tuple[str, CleanReport]:
     """Clean a single block of text. Returns (cleaned_text, report).
 
     Steps are applied in a fixed order and each is recorded in the report, so the
@@ -83,9 +81,7 @@ def clean_text(
         out = _HYPHEN_BREAK.sub(r"\1\2", out)
         report.steps.append("join_hyphenated_linebreaks")
     if config.drop_page_number_lines:
-        out = "\n".join(
-            ln for ln in out.split("\n") if not _PAGE_NUM_LINE.match(ln)
-        )
+        out = "\n".join(ln for ln in out.split("\n") if not _PAGE_NUM_LINE.match(ln))
         report.steps.append("drop_page_number_lines")
     if config.collapse_whitespace:
         out = _TRAILING_WS.sub(r"\1", out)
@@ -106,9 +102,7 @@ def _detect_repeated_lines(pages: list[str], config: CleaningConfig) -> set[str]
     for page in pages:
         # Consider only short-ish lines near the top/bottom-boundary noise; count once
         # per page even if a line appears multiple times on that page.
-        seen_on_page = {
-            ln.strip() for ln in page.split("\n") if 0 < len(ln.strip()) <= 120
-        }
+        seen_on_page = {ln.strip() for ln in page.split("\n") if 0 < len(ln.strip()) <= 120}
         counts.update(seen_on_page)
     threshold = max(
         config.header_footer_min_pages,
@@ -136,9 +130,7 @@ def clean_documents(
         for d in group:
             body = d.page_content
             if repeated:
-                body = "\n".join(
-                    ln for ln in body.split("\n") if ln.strip() not in repeated
-                )
+                body = "\n".join(ln for ln in body.split("\n") if ln.strip() not in repeated)
             text, _report = clean_text(body, config)
             if not text:
                 continue

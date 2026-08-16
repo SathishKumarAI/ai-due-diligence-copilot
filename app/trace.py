@@ -99,9 +99,7 @@ def dense_scores(vectorstore: VectorStore, query: str, k: int) -> dict[tuple, fl
     return {_doc_key(doc): float(score) for doc, score in pairs}
 
 
-def chunk_traces(
-    docs: list[Document], score_map: dict[tuple, float]
-) -> list[RetrievedChunkTrace]:
+def chunk_traces(docs: list[Document], score_map: dict[tuple, float]) -> list[RetrievedChunkTrace]:
     """Turn the final ranked docs into inspector rows, attaching dense scores."""
     out: list[RetrievedChunkTrace] = []
     for i, d in enumerate(docs, start=1):

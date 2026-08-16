@@ -1,4 +1,5 @@
 """Observability (feature F09): JSON logging, request IDs, Prometheus metrics."""
+
 from __future__ import annotations
 
 import logging
@@ -11,15 +12,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-REQUESTS = Counter(
-    "rag_requests_total", "Total HTTP requests", ["path", "method", "status"]
-)
+REQUESTS = Counter("rag_requests_total", "Total HTTP requests", ["path", "method", "status"])
 REQUEST_LATENCY = Histogram(
     "rag_request_latency_seconds", "Request latency in seconds", ["path", "method"]
 )
-ASK_LATENCY = Histogram(
-    "rag_ask_stage_seconds", "RAG stage latency in seconds", ["stage"]
-)
+ASK_LATENCY = Histogram("rag_ask_stage_seconds", "RAG stage latency in seconds", ["stage"])
 CACHE_HITS = Counter("rag_cache_hits_total", "Answer cache hits")
 
 

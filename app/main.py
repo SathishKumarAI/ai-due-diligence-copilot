@@ -138,9 +138,7 @@ def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> sch
 
     # Explain mode (F23): full pipeline trace, not cached (traces are for inspection).
     if req.explain:
-        result, tr = engine.answer_with_trace(
-            req.question, top_k, history=_to_turns(req.history)
-        )
+        result, tr = engine.answer_with_trace(req.question, top_k, history=_to_turns(req.history))
         for stage, ms in result.timings_ms.items():
             ASK_LATENCY.labels(stage.replace("_ms", "")).observe(ms / 1000.0)
         return schemas.AskResponse(
@@ -232,6 +230,10 @@ async def upload(
     name. Supported: .pdf .md .markdown .txt and images (.png/.jpg/...) via OCR (F20).
     Re-uploading the same name replaces it.
     """
+    from typing import cast
+
+    from langchain_chroma import Chroma
+
     from app.ingest import SUPPORTED_SUFFIXES, add_file_to_store
 
     safe_name = Path(filename).name  # strip any path traversal
@@ -251,7 +253,9 @@ async def upload(
     dest.write_bytes(body)
 
     try:
-        added = add_file_to_store(engine.vectorstore, dest, settings)
+        # RagEngine holds the store as a VectorStore (provider seam); incremental
+        # add needs Chroma's collection API, and build_engine always builds Chroma.
+        added = add_file_to_store(cast(Chroma, engine.vectorstore), dest, settings)
     except ValueError as exc:
         dest.unlink(missing_ok=True)
         raise HTTPException(400, str(exc)) from exc

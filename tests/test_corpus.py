@@ -39,6 +39,10 @@ def test_latest_10k_url_picks_10k(monkeypatch):
 
 
 def test_latest_10k_url_none_when_absent(monkeypatch):
-    submissions = {"filings": {"recent": {"form": ["8-K"], "accessionNumber": ["x"], "primaryDocument": ["a.htm"]}}}
+    submissions = {
+        "filings": {
+            "recent": {"form": ["8-K"], "accessionNumber": ["x"], "primaryDocument": ["a.htm"]}
+        }
+    }
     monkeypatch.setattr(fetch_corpus, "_get", lambda url: json.dumps(submissions).encode())
     assert fetch_corpus.latest_10k_url("0000320193") is None

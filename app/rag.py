@@ -198,7 +198,7 @@ class RagEngine:
         question: str,
         top_k: int | None = None,
         history: list[Turn] | None = None,
-    ) -> tuple[Answer, "_trace.PipelineTrace"]:
+    ) -> tuple[Answer, _trace.PipelineTrace]:
         """Answer a question AND return a full pipeline trace (feature F23).
 
         Same behaviour as :meth:`answer`, but records every stage — condensed query,

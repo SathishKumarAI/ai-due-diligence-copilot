@@ -72,9 +72,7 @@ def load_one(path: Path, settings: Settings = default_settings) -> list[Document
     return loaded
 
 
-def load_documents(
-    data_dir: Path, settings: Settings = default_settings
-) -> list[Document]:
+def load_documents(data_dir: Path, settings: Settings = default_settings) -> list[Document]:
     """Load every supported file under data_dir, then clean (F21) if enabled."""
     docs: list[Document] = []
     for path in sorted(data_dir.rglob("*")):
