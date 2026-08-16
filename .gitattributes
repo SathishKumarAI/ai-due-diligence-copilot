@@ -1,0 +1,29 @@
+# Line endings are LF in the repository AND in the working tree, on every platform.
+#
+# Not a style preference. Git for Windows ships with core.autocrlf=true in its *system*
+# config, so a fresh clone on Windows rewrites every text file to CRLF on checkout. For
+# this repo that is a correctness bug, not a cosmetic one:
+#
+#   - data/*.md is the corpus. CRLF adds one byte per line, so the same document chunks
+#     differently on Windows than on Linux - different chunk boundaries, different
+#     embeddings, different retrieval results. Every measurement in docs/RUN-LOG.md is
+#     implicitly a measurement of the LF corpus.
+#   - scripts/*.sh and the Makefile break outright with CRLF (`\r` in a shebang, and tab
+#     rules that no longer parse).
+#   - ENGINE_MANIFEST.sha256 hashes file contents to detect drift between the three sibling
+#     repos. CRLF checkouts change every hash, so parity would report drift that does not
+#     exist.
+#
+# Measured before writing this: cloning this repo on Windows produced acme_10k_excerpt.md
+# at 658 bytes with 19 CRLFs, against 639 bytes with 19 LFs in the index.
+* text=auto eol=lf
+
+# Files that are fatal rather than merely wrong with CRLF, pinned explicitly so the
+# reason survives even if the blanket rule above is ever relaxed.
+*.sh    text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+
+# Windows-native scripts. PowerShell reads LF fine, and keeping them LF means one rule
+# for the whole tree rather than a per-file exception nobody remembers.
+*.ps1   text eol=lf
