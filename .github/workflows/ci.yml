@@ -76,5 +76,33 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build CPU image
         run: docker build -t ai-due-diligence-copilot:ci .
+
+      # The images were built and never inspected, so a known-vulnerable base layer would
+      # ship silently. ignore-unfixed is the important flag: a CVE with no available patch
+      # is not something a merge can act on, and blocking on it trains people to bypass the
+      # gate. A fixable HIGH/CRITICAL is actionable, so it fails.
+      - name: Scan CPU image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ai-due-diligence-copilot:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
       - name: Build GPU image (build only; no GPU needed to build)
         run: docker build -f Dockerfile.gpu -t ai-due-diligence-copilot:ci-gpu .
+
+      # The GPU image is scanned but does not block. It is built on an NVIDIA CUDA base
+      # that is large, updated on NVIDIA's schedule rather than ours, and not the image
+      # this project deploys. Failing the build on a CVE nobody here can fix would make the
+      # whole docker job advisory in practice; reporting it keeps the information without
+      # the false authority.
+      - name: Scan GPU image (report only)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ai-due-diligence-copilot:ci-gpu
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          format: table

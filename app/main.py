@@ -52,6 +52,7 @@ def build_engine() -> RagEngine:
         reranker=build_reranker(settings),
         fetch_k=settings.retrieve_fetch_k,
         history_max_turns=settings.history_max_turns,
+        max_chunks_per_source=settings.max_chunks_per_source,
     )
 
 
@@ -67,15 +68,29 @@ def _cache_question(question: str, history: list[schemas.Turn]) -> str:
     return f"{question}\x00{tail}"
 
 
+def _count_chunks(engine: RagEngine | None) -> int | None:
+    """Chunks in the live collection, or None when the handle can no longer answer.
+
+    None is the signal that the process is holding a collection that has been replaced
+    underneath it — see :func:`get_engine`.
+    """
+    if engine is None:
+        return None
+    try:
+        return int(engine.vectorstore._collection.count())  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - non-Chroma store, or a handle whose collection is gone
+        return None
+
+
 def _corpus_fingerprint() -> str:
     """Identify the indexed corpus, so cached answers do not outlive it."""
     engine = getattr(app.state, "engine", None)
     if engine is None:
         return "no-index"
-    try:
-        return f"{settings.collection_name}:{engine.vectorstore._collection.count()}"  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001 - non-Chroma store; fall back to not caching across restarts
+    count = _count_chunks(engine)
+    if count is None:
         return "unknown"
+    return f"{settings.collection_name}:{count}"
 
 
 @asynccontextmanager
@@ -106,7 +121,35 @@ app.add_middleware(
 
 
 def get_engine() -> RagEngine:
+    """The live engine, rebuilt in place if its collection was replaced underneath it.
+
+    `python -m app.ingest` is the documented way to (re)build the index and it runs in a
+    *separate process*. Doing that while the API serves used to break the running
+    instance permanently: Chroma resets the collection, this process keeps a handle to
+    the old one, and every subsequent request died with an opaque 500 — the UI reported
+    "Could not load the trace. Is the backend running?" while the backend was running
+    fine. Only a restart recovered it.
+
+    Rebuilding on demand costs one collection count per request. Measured at 0.25 ms
+    (2000 calls, local Chroma/SQLite, 11 chunks) against an /v1/ask that spends seconds
+    in the LLM — the cost is not detectable, and it removes the failure class entirely.
+    """
     engine = getattr(app.state, "engine", None)
+
+    if engine is not None and _count_chunks(engine) is None:
+        log.warning("engine_handle_stale", action="rebuilding")
+        try:
+            engine = build_engine()
+        except Exception as exc:  # noqa: BLE001 - report why rather than 500 opaquely
+            app.state.engine = None
+            raise HTTPException(503, f"Index unavailable and could not be reloaded: {exc}") from exc
+        app.state.engine = engine
+        # The corpus changed, so the old cache is keyed to a corpus that no longer
+        # exists. Rebuilding the cache re-derives the fingerprint and stops answers from
+        # the previous index being served against the new one.
+        app.state.cache = AnswerCache(settings, corpus_fingerprint=_corpus_fingerprint())
+        log.info("engine_reloaded", chunks=_count_chunks(engine))
+
     if engine is None:
         raise HTTPException(503, "Index not built. Run `python -m app.ingest` first.")
     return engine
@@ -128,12 +171,8 @@ def health() -> schemas.HealthResponse:
 @app.get("/ready", response_model=schemas.ReadyResponse, tags=["ops"])
 def ready() -> schemas.ReadyResponse:
     engine = getattr(app.state, "engine", None)
-    n = 0
-    if engine is not None:
-        try:
-            n = engine.vectorstore._collection.count()  # type: ignore[attr-defined]
-        except Exception:  # noqa: BLE001
-            n = -1
+    count = _count_chunks(engine)
+    n = 0 if engine is None else (-1 if count is None else count)
     # -1 means the collection could not be counted at all — which happens for real: a
     # re-ingest while the API is serving resets the collection under the process, and it
     # keeps a handle that can no longer answer. Reporting ready=true alongside

@@ -27,3 +27,14 @@ data/corpus/
 # Exported vector space for the Embedding Projector (F26): derived from the index,
 # regenerate with scripts/export_embeddings.py. A few MB of floats, not source.
 data/embeddings/
+# Evaluation run history (scripts/run_log.py). Machine-local by design: it records what
+# *this* machine measured, including runs from dirty trees, and every run appends a line.
+# Committing it would conflict on every eval and mix results from different hardware and
+# models into one series. The curated narrative that belongs to the repo is
+# docs/RUN-LOG.md; this is the raw append-only log behind it.
+data/runs.jsonl
+# Ragas-generated questions (scripts/generate_testset.py). Regenerable, and deliberately
+# not committed: it is unverified LLM output, and a file sitting in eval/ next to the
+# hand-written qa_dataset.jsonl reads as an endorsed dataset. Generate it, read it, use
+# it — do not let it accrete authority by being checked in.
+eval/qa_generated.jsonl

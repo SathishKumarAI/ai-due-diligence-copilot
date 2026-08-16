@@ -20,7 +20,7 @@ from app import grounding as _grounding
 from app import trace as _trace
 from app.prompts import CONDENSE_PROMPT, SYSTEM_PROMPT
 from app.rerank import NoOpReranker, Reranker
-from app.retrieval import DenseRetriever, HybridRetriever, Retriever
+from app.retrieval import DenseRetriever, HybridRetriever, Retriever, cap_per_source
 
 # Marker parsing lives in app.grounding so the two cannot drift; a citation the
 # engine recognises must be one the verifier recognises.
@@ -80,6 +80,7 @@ class RagEngine:
         reranker: Reranker | None = None,
         fetch_k: int = 20,
         history_max_turns: int = 6,
+        max_chunks_per_source: int = 0,
     ) -> None:
         self.vectorstore = vectorstore
         self.llm = llm
@@ -89,6 +90,7 @@ class RagEngine:
         self.reranker = reranker or NoOpReranker()
         self.fetch_k = fetch_k
         self.history_max_turns = history_max_turns
+        self.max_chunks_per_source = max_chunks_per_source
 
     # --- conversation memory (F19) ---
 
@@ -114,10 +116,18 @@ class RagEngine:
     # --- retrieval (F02 / F16 / F17) ---
 
     def _retrieve(self, query: str, top_k: int) -> list[Document]:
-        """Fetch candidates then (optionally) rerank down to ``top_k``."""
-        fetch = max(top_k, self.fetch_k) if not isinstance(self.reranker, NoOpReranker) else top_k
+        """Fetch candidates, optionally rerank, then enforce source diversity.
+
+        When the per-source cap is on, always over-fetch: capping can only spread results
+        across sources if there are spare candidates to reach for, and asking for exactly
+        top_k leaves nothing to substitute in.
+        """
+        capping = self.max_chunks_per_source > 0
+        needs_candidates = capping or not isinstance(self.reranker, NoOpReranker)
+        fetch = max(top_k, self.fetch_k) if needs_candidates else top_k
         candidates = self.retriever.retrieve(query, fetch)
-        return self.reranker.rerank(query, candidates, top_k)
+        ranked = self.reranker.rerank(query, candidates, fetch if capping else top_k)
+        return cap_per_source(ranked, top_k, self.max_chunks_per_source)
 
     def _build_messages(self, question: str, context: str) -> list[tuple[str, str]]:
         user = (

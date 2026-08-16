@@ -107,6 +107,35 @@ def reciprocal_rank_fusion(
     return [seen[key] for key, _ in ordered[:k]]
 
 
+def cap_per_source(docs: list[Document], k: int, cap: int) -> list[Document]:
+    """Take the best ``k`` documents, letting no single source exceed ``cap`` of them.
+
+    Retrieval ranks by similarity alone, so a source that repeats itself outranks a
+    source that says something once. That is a security property, not just a quality one:
+    one uploaded document producing twelve near-identical chunks filled every retrieved
+    slot and the answer became that document's claim.
+
+    Anything skipped by the cap is used to backfill if there is nothing else to take, so
+    a corpus that legitimately has only one relevant source still returns ``k`` results.
+    Diversity is preferred, never required.
+    """
+    if cap <= 0 or k <= 0:
+        return docs[:k]
+    kept: list[Document] = []
+    overflow: list[Document] = []
+    seen: Counter[str] = Counter()
+    for doc in docs:
+        source = str(doc.metadata.get("source", "unknown"))
+        if seen[source] < cap:
+            kept.append(doc)
+            seen[source] += 1
+        else:
+            overflow.append(doc)
+        if len(kept) == k:
+            return kept
+    return (kept + overflow)[:k]
+
+
 class HybridRetriever:
     """Dense + BM25, fused with RRF (feature F16)."""
 

@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     # --- hybrid retrieval (F16) ---
     retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
     retrieve_fetch_k: int = 20  # candidates each arm fetches before fusion / rerank
+    # No single document may occupy more than this many of the top_k slots, when other
+    # sources are available. Measured attack: uploading one document that produced 12
+    # near-identical chunks filled all 5 retrieved slots and the answer became the
+    # attacker's number, with all 5 citations pointing at the hostile file. No prompt
+    # injection was needed - volume alone crowded the true document out of top_k.
+    # Set to 0 to disable the cap.
+    max_chunks_per_source: int = 2
     rrf_k: int = 60  # Reciprocal Rank Fusion constant
 
     # --- re-ranking (F17) ---

@@ -81,6 +81,15 @@ WEAK_COVERAGE = 0.40
 _META_RE = re.compile(
     r"\b(?:i cannot|i can't|i am unable|i'm unable|cannot provide|can't provide"
     r"|not mentioned|no mention|not provided|no information|do not have|don't have"
+    # Absence claims. Measured over the eval set: "The provided documents do not
+    # explicitly state the potential financial impact" was scored *unsupported* at 0.20
+    # coverage, which reads as "the model made this up" when the model did the opposite -
+    # it declined, correctly, and said so. A lexical checker cannot verify an absence
+    # anyway: there is no span in the source that proves something is missing from it.
+    # Scoring it as a failed claim is worse than not scoring it.
+    r"|do(?:es)? not (?:explicitly |specifically )?(?:state|specify|mention|say|indicate"
+    r"|detail|disclose|cover|include|provide)"
+    r"|don't (?:explicitly |specifically )?(?:state|specify|mention|say)"
     r"|if you'd like|if you would like|would you like|let me know)\b",
     re.IGNORECASE,
 )
@@ -124,10 +133,21 @@ class ClaimVerdict:
 
 
 @dataclass
+class FigureConflict:
+    """The same quantity, given two different values by two different retrieved chunks."""
+
+    context: list[str] = field(default_factory=list)  # shared words naming the quantity
+    values: list[dict] = field(default_factory=list)  # {value, source, snippet}
+
+
+@dataclass
 class GroundingReport:
     """Verdicts for every claim, plus the totals a caller can gate on."""
 
     claims: list[ClaimVerdict] = field(default_factory=list)
+    # Disagreements *between the sources themselves*, which claim-level verification is
+    # structurally blind to. See find_conflicts.
+    conflicts: list[FigureConflict] = field(default_factory=list)
     grounded: int = 0
     weak: int = 0
     unsupported: int = 0
@@ -271,9 +291,137 @@ def verify_claim(claim: str, markers: list[int], docs: list[Document]) -> ClaimV
     return verdict
 
 
+_CONTEXT_WINDOW = 6  # content words either side of a figure that name what it measures
+_CONTEXT_OVERLAP = 0.34  # Jaccard above which two figures are talking about the same thing
+
+
+def _unit(token: str) -> str:
+    """Coarse unit signature, so a percentage is never compared against a dollar amount."""
+    if token.endswith("%"):
+        return "pct"
+    if token.startswith("$"):
+        return "money"
+    return "plain"
+
+
+def _numeric_value(token: str) -> float | None:
+    cleaned = token.strip("$%").replace(",", "")
+    # Trailing magnitude suffixes the tokenizer keeps attached ("12.4m").
+    scale = {"k": 1e3, "m": 1e6, "b": 1e9}.get(cleaned[-1:], None)
+    if scale is not None:
+        cleaned = cleaned[:-1]
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return None
+    return value * scale if scale else value
+
+
+def _looks_like_a_year(token: str, value: float | None) -> bool:
+    """Years share context with everything nearby and would swamp the signal."""
+    return (
+        _unit(token) == "plain" and token.isdigit() and value is not None and 1900 <= value <= 2100
+    )
+
+
+def _figures_with_context(doc: Document) -> list[tuple[str, float, set[str]]]:
+    """Every figure in a chunk, paired with the content words that say what it measures."""
+    tokens = _tokenize(doc.page_content)
+    out: list[tuple[str, float, set[str]]] = []
+    for i, token in enumerate(tokens):
+        if not _is_figure(token):
+            continue
+        value = _numeric_value(token)
+        if value is None or _looks_like_a_year(token, value):
+            continue
+        lo, hi = max(0, i - _CONTEXT_WINDOW), min(len(tokens), i + _CONTEXT_WINDOW + 1)
+        context = {
+            t
+            for t in tokens[lo:i] + tokens[i + 1 : hi]
+            if t not in _STOPWORDS and not _is_figure(t)
+        }
+        if context:
+            out.append((token, value, context))
+    return out
+
+
+def find_conflicts(docs: list[Document]) -> list[FigureConflict]:
+    """Figures that describe the same quantity but disagree, across retrieved chunks.
+
+    This exists because claim-level verification cannot catch the attack that actually
+    worked against this system. F24 checks an answer against *the chunks that were
+    retrieved for it*, so when an attacker controls what gets retrieved, a false figure is
+    faithfully "grounded" — measured live: an uploaded document asserting 512 months of
+    runway produced a confidently cited answer, while the true 12.8 months never surfaced.
+    Verification against the sources cannot help when the sources are the problem.
+
+    What can help is noticing that the retrieved set *disagrees with itself*. Two chunks
+    saying "runway ... 12.8 months" and "runway ... 512 months" is a fact about the corpus,
+    visible without trusting either one.
+
+    Deliberately a flag, not a judgement: it says "these two disagree, look", never which
+    is right. Comparison is restricted to figures sharing a unit signature and enough
+    surrounding vocabulary, and years are skipped — they sit near everything and would
+    bury the real signal.
+    """
+    entries: list[tuple[str, float, set[str], Document]] = []
+    for doc in docs:
+        for token, value, context in _figures_with_context(doc):
+            entries.append((token, value, context, doc))
+
+    conflicts: list[FigureConflict] = []
+    used: set[int] = set()
+    for i, (tok_a, val_a, ctx_a, doc_a) in enumerate(entries):
+        if i in used:
+            continue
+        group = [(tok_a, val_a, doc_a)]
+        shared = set(ctx_a)
+        source_a = str(doc_a.metadata.get("source", "unknown"))
+        for j in range(i + 1, len(entries)):
+            tok_b, val_b, ctx_b, doc_b = entries[j]
+            if j in used or _unit(tok_a) != _unit(tok_b) or val_a == val_b:
+                continue
+            # Only across sources. Two figures inside one document are that author's own
+            # prose, not a contradiction between sources, and neighbouring metrics share
+            # far too much vocabulary: "Gross margin: 61%. Net revenue retention of 118%."
+            # matched at overlap 1.0 and was reported as a conflict between two entirely
+            # different measures. A document that genuinely contradicts itself is not
+            # caught by this, which is the honest cost of removing that whole false-
+            # positive class.
+            if str(doc_b.metadata.get("source", "unknown")) == source_a:
+                continue
+            overlap = len(ctx_a & ctx_b) / len(ctx_a | ctx_b)
+            if overlap < _CONTEXT_OVERLAP:
+                continue
+            group.append((tok_b, val_b, doc_b))
+            shared &= ctx_b
+            used.add(j)
+        if len(group) < 2:
+            continue
+        used.add(i)
+        conflicts.append(
+            FigureConflict(
+                context=sorted(shared),
+                values=[
+                    {
+                        "value": tok,
+                        "source": str(doc.metadata.get("source", "unknown")),
+                        "snippet": " ".join(doc.page_content.split())[:160],
+                    }
+                    for tok, _, doc in group
+                ],
+            )
+        )
+    return conflicts
+
+
 def verify_answer(answer: str, docs: list[Document]) -> GroundingReport:
     """Verify every claim in an answer against the chunks that were retrieved for it."""
     report = GroundingReport()
+    # Computed regardless of what the answer said. A contradiction between two sources is
+    # a property of the retrieved set, so it is worth surfacing even when the model
+    # declined to answer - arguably especially then.
+    report.conflicts = find_conflicts(docs)
 
     if is_refusal(answer):
         report.verdict = "refusal"

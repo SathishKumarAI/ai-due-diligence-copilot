@@ -107,14 +107,20 @@ function ChunkRow({
   chunk: PipelineTrace["retrieved"][number];
   all: PipelineTrace["retrieved"];
 }) {
-  // Chroma returns a distance (smaller = closer). Draw the bar so the closest chunk
-  // is fullest; skip bars if scores are unavailable (non-Chroma store / fake).
+  // Chroma returns a distance (smaller = closer). Draw the bar so the closest chunk is
+  // fullest; skip bars if scores are unavailable (non-Chroma store / fake).
+  //
+  // Scaled against the BEST distance in the set, not min-to-max. Min-max normalisation
+  // pinned the closest chunk at 100% and the furthest at exactly 0% no matter what the
+  // numbers were, so the last row rendered as an empty bar even when it was a perfectly
+  // good match — the set here scored 0.672 / 0.693 / 0.742 / 0.738 / 0.869, five results
+  // within 0.2 of each other, one of which looked like zero. That reads as "this chunk is
+  // worthless" when it means "this chunk ranked fifth".
   const scores = all.map((c) => c.dense_score).filter((s): s is number => s !== null);
   let width: number | null = null;
-  if (chunk.dense_score !== null && scores.length > 1) {
-    const min = Math.min(...scores);
-    const max = Math.max(...scores);
-    width = max === min ? 100 : Math.round(((max - chunk.dense_score) / (max - min)) * 100);
+  if (chunk.dense_score !== null && scores.length > 0) {
+    const best = Math.min(...scores);
+    width = Math.max(6, Math.round((best / chunk.dense_score) * 100));
   }
   return (
     <div className="rounded-lg border p-2" style={{ borderColor: "var(--border)" }}>

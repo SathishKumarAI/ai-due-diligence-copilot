@@ -4,12 +4,12 @@ langchain-community>=0.3,<0.4
 langchain-chroma>=0.2,<0.3
 langchain-text-splitters>=0.3,<0.4
 chromadb>=0.5,<2
-pypdf>=5,<6
+pypdf>=6.14.2,<7
 
 # OCR ingestion (F20) — needs the system Tesseract binary + Poppler (see scripts/install-ocr.sh)
 pytesseract>=0.3.10,<1
 pdf2image>=1.17,<2
-pillow>=10,<12
+pillow>=12.3,<13
 
 # Open-source provider (default)
 langchain-ollama>=0.2,<1
