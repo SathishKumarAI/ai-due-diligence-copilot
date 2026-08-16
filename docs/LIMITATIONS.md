@@ -131,10 +131,12 @@ Also true:
   `all_documents()` loads every chunk into RAM. Fine at 11 chunks; it is a hard ceiling
   at 100k.
 - **Chroma is single-node local persistence.** No replication, no backups, no migrations.
-- **Re-ingesting while the API serves breaks the running instance.** It keeps a stale
-  collection handle; `/ready` now correctly reports `indexed_chunks: -1` and
-  `ready: false`, but nothing *prevents* it and there is no hot reload. A restart is
-  required.
+- **Re-ingesting while the API serves is now survivable, not free.** The process keeps a
+  stale collection handle, which used to poison the instance until a restart. The next
+  `/v1/*` request detects the dead handle and rebuilds the engine in place — measured at
+  ~2.0s, during which that one request blocks. `/ready` still reports `indexed_chunks: -1`
+  in the window between the re-ingest and the next request, which is correct: an
+  orchestrator should not route to an instance that has lost its index.
 - **The answer cache is invalidated only by a coarse fingerprint** (collection chunk
   count). Editing a document without changing the chunk count leaves stale answers cached
   until the TTL expires.
