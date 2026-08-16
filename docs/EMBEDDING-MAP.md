@@ -35,16 +35,46 @@ Wrote 247 points x 384 dims to data\embeddings
   query  10
 ```
 
-Then open <https://projector.tensorflow.org> → **Load** → give it
-`data/embeddings/vectors.tsv` and `data/embeddings/metadata.tsv`.
+### Viewing it, fully local (recommended, verified)
 
-The page parses the files **in the browser**; nothing is uploaded. That is the only
-reason a hosted page is an acceptable suggestion for a project whose whole posture is
-local-first. If you would rather not rely on that, the projector's standalone build is
-Apache-2.0 static files and needs no backend — serve it yourself.
+The projector's standalone build is Apache-2.0 static files with no backend, so the
+whole thing runs offline and the file-picker step disappears:
 
-In the UI: colour by **kind**, switch the projection to **UMAP** or **t-SNE**, and tick
-**3D**.
+```bash
+git clone --depth 1 https://github.com/tensorflow/embedding-projector-standalone.git
+cd embedding-projector-standalone
+mkdir -p rag_data && cp /path/to/repo/data/embeddings/*.tsv rag_data/
+
+cat > rag_data/config.json <<'JSON'
+{
+  "embeddings": [
+    {
+      "tensorName": "RAG pipeline - chunks, tokens, queries",
+      "tensorShape": [247, 384],
+      "tensorPath": "rag_data/vectors.tsv",
+      "metadataPath": "rag_data/metadata.tsv"
+    }
+  ]
+}
+JSON
+
+python -m http.server 8189 --bind 127.0.0.1
+```
+
+Open <http://127.0.0.1:8189/?config=rag_data/config.json>. `tensorShape` must match the
+export — the exporter prints both numbers.
+
+Set **Label by** to `label` and **Color by** to `kind`. Labelling by `kind` is the
+default the first time and makes every point read "token", which is not a word map.
+
+### Or the hosted page
+
+<https://projector.tensorflow.org> → **Load** → give it the two TSVs. It parses them in
+the browser and uploads nothing, which is the only reason a hosted page is acceptable
+here at all. The local route above avoids the question entirely.
+
+In either: switch the projection to **UMAP** or **t-SNE** and tick **3D**. PCA is the
+default and is instant; UMAP takes a few seconds and usually separates the groups better.
 
 ## What is in the space
 

@@ -166,9 +166,15 @@ def main() -> int:
     vectors_path = args.out / "vectors.tsv"
     metadata_path = args.out / "metadata.tsv"
 
+    # newline="\n" is not cosmetic. Without it Python translates "\n" to "\r\n" on
+    # Windows, the projector splits lines on "\n" only, and every last column arrives
+    # with a trailing CR — the header became "preview\r" and every preview value ended
+    # in an invisible carriage return. It loads without complaint, which is what makes
+    # it worth pinning down.
     vectors_path.write_text(
         "\n".join("\t".join(f"{x:.6f}" for x in vec) for vec in vectors) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     # The projector requires a header row whenever metadata has more than one column,
     # and silently mis-reads the file without it.
@@ -176,6 +182,7 @@ def main() -> int:
     metadata_path.write_text(
         "\n".join(["\t".join(columns)] + ["\t".join(r[c] for c in columns) for r in rows]) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
 
     counts = Counter(r["kind"] for r in rows)
