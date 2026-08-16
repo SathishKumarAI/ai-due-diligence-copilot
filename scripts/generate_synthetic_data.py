@@ -74,9 +74,9 @@ def financials(rng: random.Random) -> tuple[str, str]:
 
 
 def term_sheet(rng: random.Random) -> tuple[str, str]:
-    body = """# Acme Robotics — Series B Term Sheet (synthetic sample)
+    body = f"""# Acme Robotics — Series B Term Sheet (synthetic sample)
 
-{disc}
+{DISCLAIMER}
 - Security: Series B Preferred Stock
 - Amount: $40,000,000
 - Post-money valuation: $220,000,000
@@ -84,14 +84,14 @@ def term_sheet(rng: random.Random) -> tuple[str, str]:
 - Anti-dilution: broad-based weighted average
 - Option pool: 12% post-financing, created pre-money (dilutes existing holders)
 - Founder vesting: 4 years, 1-year cliff, reset on close
-""".format(disc=DISCLAIMER)
+"""
     return "acme_term_sheet.md", body
 
 
 def risks(rng: random.Random) -> tuple[str, str]:
-    body = """# Acme Robotics — Risk Factors (synthetic sample)
+    body = f"""# Acme Robotics — Risk Factors (synthetic sample)
 
-{disc}
+{DISCLAIMER}
 ## Customer concentration
 A single customer accounts for 22% of ARR. Loss of this customer would materially
 reduce revenue.
@@ -105,7 +105,7 @@ European market entry requires CE machinery safety certification (6-9 months, no
 
 ## Financial
 The company is unprofitable and will require additional financing beyond the Series B.
-""".format(disc=DISCLAIMER)
+"""
     return "acme_risk_factors.md", body
 
 

@@ -2,8 +2,10 @@
 # Multi-stage build: install deps in a builder, run as a non-root user.
 FROM python:3.12-slim AS builder
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# The lock, not the ranges: an image built today must contain the versions that
+# were tested, not whatever PyPI resolves at build time.
+COPY requirements.lock .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.lock
 
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1

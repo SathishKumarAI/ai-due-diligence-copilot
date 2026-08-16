@@ -21,10 +21,15 @@ WORKDIR /app
 # CUDA-enabled torch first (cu128 wheel index); sentence-transformers then reuses it
 # instead of pulling the CPU build. cu128 not cu124 — Blackwell (RTX 50-series) is sm_120,
 # which cu124 wheels have no kernels for; cu128 covers sm_75..sm_120.
-COPY requirements.txt .
+#
+# Pinned to the lockfile's torch version. Installing an unpinned CUDA build and then the
+# lock lets pip replace the CUDA wheel with the CPU one from PyPI, producing an image
+# that looks fine and silently reports torch.cuda.is_available() == False.
+COPY requirements.lock .
 RUN python3.12 -m pip install --no-cache-dir --upgrade pip \
- && python3.12 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu128 \
- && python3.12 -m pip install --no-cache-dir -r requirements.txt
+ && python3.12 -m pip install --no-cache-dir "$(grep '^torch==' requirements.lock)" \
+      --index-url https://download.pytorch.org/whl/cu128 \
+ && python3.12 -m pip install --no-cache-dir -r requirements.lock
 
 RUN useradd --create-home --uid 10001 appuser
 COPY app/ ./app/

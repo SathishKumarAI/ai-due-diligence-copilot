@@ -21,14 +21,24 @@ python -m pip install --upgrade pip
 if ($Gpu) {
   # cu128, not cu124: Blackwell (RTX 50-series) is sm_120, and cu124 wheels ship no sm_120
   # kernels - torch imports fine, then fails at the first CUDA op. cu128 covers sm_75..sm_120.
-  Write-Host "==> Installing CUDA torch (cu128)"
-  pip install torch --index-url https://download.pytorch.org/whl/cu128
+  #
+  # Pin to the version in the lockfile rather than "latest CUDA torch". Installing an
+  # unpinned CUDA build and then the lock means pip finds a different torch version
+  # pinned and quietly replaces the working GPU build with the CPU one from PyPI - the
+  # only symptom being that torch.cuda.is_available() turns False.
+  $torchPin = (Select-String -Path requirements.lock -Pattern '^torch==').Line
+  if (-not $torchPin) { throw "No torch pin found in requirements.lock" }
+  Write-Host "==> Installing CUDA torch (cu128): $torchPin"
+  pip install "$torchPin" --index-url https://download.pytorch.org/whl/cu128
   if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { nvidia-smi -L }
   else { Write-Warning "nvidia-smi not found - install the NVIDIA driver, or run CPU mode." }
 }
 
-Write-Host "==> Installing app deps"
-pip install -r requirements.txt
+# The lockfile, not requirements.txt: the ranges there resolved to a different ruff,
+# numpy and langchain in July than they do today, which is what broke the quality gate
+# and hid two failing tests. Regenerate with scripts/lock.ps1 when a range changes.
+Write-Host "==> Installing app deps (locked)"
+pip install -r requirements.lock
 
 Write-Host @"
 
