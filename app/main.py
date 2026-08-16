@@ -136,9 +136,18 @@ _guarded = [Depends(require_api_key), Depends(rate_limit)]
 def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> schemas.AskResponse:
     top_k = req.top_k or settings.top_k
 
+    def _grounding(result) -> schemas.GroundingReportModel | None:  # noqa: ANN001
+        return (
+            schemas.GroundingReportModel(**asdict(result.grounding))
+            if result.grounding is not None
+            else None
+        )
+
     # Explain mode (F23): full pipeline trace, not cached (traces are for inspection).
     if req.explain:
-        result, tr = engine.answer_with_trace(req.question, top_k, history=_to_turns(req.history))
+        result, tr = engine.answer_with_trace(
+            req.question, top_k, history=_to_turns(req.history), verify=req.verify
+        )
         for stage, ms in result.timings_ms.items():
             ASK_LATENCY.labels(stage.replace("_ms", "")).observe(ms / 1000.0)
         return schemas.AskResponse(
@@ -148,16 +157,20 @@ def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> sch
             provider=engine.provider,
             timings_ms=result.timings_ms,
             trace=schemas.PipelineTraceModel(**asdict(tr)),
+            grounding=_grounding(result),
         )
 
     cache: AnswerCache = app.state.cache
     cache_q = _cache_question(req.question, req.history)
-    cached = cache.get(cache_q, top_k)
-    if cached is not None:
-        CACHE_HITS.inc()
-        return schemas.AskResponse(**cached, cached=True)
+    # A cached payload was stored without a grounding report, so serving it under
+    # verify=true would silently answer "unverified" for an answer nobody verified.
+    if not req.verify:
+        cached = cache.get(cache_q, top_k)
+        if cached is not None:
+            CACHE_HITS.inc()
+            return schemas.AskResponse(**cached, cached=True)
 
-    result = engine.answer(req.question, top_k, history=_to_turns(req.history))
+    result = engine.answer(req.question, top_k, history=_to_turns(req.history), verify=req.verify)
     for stage, ms in result.timings_ms.items():
         ASK_LATENCY.labels(stage.replace("_ms", "")).observe(ms / 1000.0)
 
@@ -167,8 +180,10 @@ def ask(req: schemas.AskRequest, engine: RagEngine = Depends(get_engine)) -> sch
         citations=[schemas.Citation(**c.__dict__) for c in result.citations],
         provider=engine.provider,
         timings_ms=result.timings_ms,
+        grounding=_grounding(result),
     )
-    cache.set(cache_q, top_k, payload.model_dump(exclude={"cached"}))
+    if not req.verify:
+        cache.set(cache_q, top_k, payload.model_dump(exclude={"cached"}))
     return payload
 
 

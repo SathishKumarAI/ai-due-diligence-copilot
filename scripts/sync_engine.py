@@ -30,6 +30,7 @@ SHARED_ENGINE_FILES: list[str] = [
     "app/cleaning.py",
     "app/device.py",
     "app/feedback.py",
+    "app/grounding.py",
     "app/ingest.py",
     "app/main.py",
     "app/observability.py",

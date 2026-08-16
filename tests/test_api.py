@@ -6,20 +6,11 @@ embedding model) and inject the fake engine through the dependency override.
 
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
-
-@pytest.fixture
-def client(monkeypatch, fake_engine):
-    import app.main as main
-
-    # Don't build the real engine in lifespan (avoids model download).
-    monkeypatch.setattr(main, "build_engine", lambda: fake_engine)
-    main.app.dependency_overrides[main.get_engine] = lambda: fake_engine
-    with TestClient(main.app) as c:
-        yield c
-    main.app.dependency_overrides.clear()
+# The `client` fixture lives in conftest.py — test_grounding.py needs it too. The auth
+# test below still builds its own client, because it has to construct one *after*
+# monkeypatching the API key into settings.
 
 
 def test_health_is_public(client):

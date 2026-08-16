@@ -45,6 +45,33 @@ export type PipelineTrace = {
   timings_ms: Record<string, number>;
 };
 
+// --- claim grounding / verification (F24) ---
+export type ClaimStatus = "grounded" | "weak" | "unsupported" | "meta";
+
+export type ClaimVerdict = {
+  text: string;
+  markers: number[];
+  status: ClaimStatus;
+  coverage: number;
+  missing_terms: string[];
+  unsupported_figures: string[];
+  source: string | null;
+  span_text: string;
+  span_start: number | null;
+  span_end: number | null;
+};
+
+export type GroundingReport = {
+  claims: ClaimVerdict[];
+  grounded: number;
+  weak: number;
+  unsupported: number;
+  meta: number;
+  score: number;
+  verdict: "grounded" | "mixed" | "unsupported" | "refusal" | "empty" | "unverified";
+  note: string;
+};
+
 export type AskResponse = {
   question: string;
   answer: string;
@@ -53,9 +80,13 @@ export type AskResponse = {
   cached: boolean;
   timings_ms: Record<string, number>;
   trace?: PipelineTrace | null;
+  grounding?: GroundingReport | null;
 };
 
-/** Ask with explain=true to get the full pipeline trace (F23). Not streamed. */
+/**
+ * Ask with explain=true for the pipeline trace (F23) and verify=true for the claim
+ * grounding report (F24). Not streamed — the inspector re-asks the turn to get both.
+ */
 export async function askExplain(
   question: string,
   history: Turn[] = [],
@@ -64,7 +95,13 @@ export async function askExplain(
   const res = await fetch(`${siteConfig.apiBaseUrl}/v1/ask`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ question, history, top_k: topK ?? null, explain: true }),
+    body: JSON.stringify({
+      question,
+      history,
+      top_k: topK ?? null,
+      explain: true,
+      verify: true,
+    }),
   });
   if (!res.ok) throw await asError(res);
   return res.json();

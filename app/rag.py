@@ -17,6 +17,7 @@ from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.vectorstores import VectorStore
 
+from app import grounding as _grounding
 from app import trace as _trace
 from app.prompts import CONDENSE_PROMPT, SYSTEM_PROMPT
 from app.rerank import NoOpReranker, Reranker
@@ -48,6 +49,7 @@ class Answer:
     answer: str
     citations: list[Citation] = field(default_factory=list)
     timings_ms: dict[str, float] = field(default_factory=dict)
+    grounding: _grounding.GroundingReport | None = None  # F24, only when verify=True
 
 
 def _format_context(docs: list[Document]) -> str:
@@ -152,6 +154,7 @@ class RagEngine:
         question: str,
         top_k: int | None = None,
         history: list[Turn] | None = None,
+        verify: bool = False,
     ) -> Answer:
         k = top_k or self.top_k
         timings: dict[str, float] = {}
@@ -183,11 +186,15 @@ class RagEngine:
         timings["generate_ms"] = round((time.perf_counter() - t1) * 1000, 1)
 
         text = response.content if isinstance(response.content, str) else str(response.content)
+        answer_text = text.strip()
         return Answer(
             question=question,
-            answer=text.strip(),
+            answer=answer_text,
             citations=self._citations(text, docs),
             timings_ms=timings,
+            # Verification needs the full chunk text, which only exists here — the F23
+            # trace carries 280-char snippets, far too short to check a claim against.
+            grounding=_grounding.verify_answer(answer_text, docs) if verify else None,
         )
 
     def _retrieval_mode(self) -> str:
@@ -198,6 +205,7 @@ class RagEngine:
         question: str,
         top_k: int | None = None,
         history: list[Turn] | None = None,
+        verify: bool = False,
     ) -> tuple[Answer, _trace.PipelineTrace]:
         """Answer a question AND return a full pipeline trace (feature F23).
 
@@ -255,11 +263,13 @@ class RagEngine:
         timings["generate_ms"] = round((time.perf_counter() - t1) * 1000, 1)
         text = response.content if isinstance(response.content, str) else str(response.content)
 
+        answer_text = text.strip()
         ans = Answer(
             question=question,
-            answer=text.strip(),
+            answer=answer_text,
             citations=self._citations(text, docs),
             timings_ms=timings,
+            grounding=_grounding.verify_answer(answer_text, docs) if verify else None,
         )
         tr = _trace.PipelineTrace(
             original_question=question,
