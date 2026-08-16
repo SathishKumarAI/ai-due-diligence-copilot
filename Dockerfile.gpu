@@ -3,7 +3,7 @@
 # The CPU image is the default (`Dockerfile`); use this one via the compose override:
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 # Requires the NVIDIA Container Toolkit on the host.
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DEBIAN_FRONTEND=noninteractive
 
@@ -18,11 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends software-proper
 
 WORKDIR /app
 
-# CUDA-enabled torch first (cu124 wheel index); sentence-transformers then reuses it
-# instead of pulling the CPU build.
+# CUDA-enabled torch first (cu128 wheel index); sentence-transformers then reuses it
+# instead of pulling the CPU build. cu128 not cu124 — Blackwell (RTX 50-series) is sm_120,
+# which cu124 wheels have no kernels for; cu128 covers sm_75..sm_120.
 COPY requirements.txt .
 RUN python3.12 -m pip install --no-cache-dir --upgrade pip \
- && python3.12 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124 \
+ && python3.12 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu128 \
  && python3.12 -m pip install --no-cache-dir -r requirements.txt
 
 RUN useradd --create-home --uid 10001 appuser

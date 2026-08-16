@@ -41,7 +41,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 docker compose exec ollama ollama pull llama3.1:8b
 ```
 
-The overlay builds `Dockerfile.gpu` (CUDA 12.4 base + CUDA torch + Tesseract/Poppler),
+The overlay builds `Dockerfile.gpu` (CUDA 12.8 base + CUDA torch + Tesseract/Poppler),
 reserves the GPU for **both** the API and Ollama, and sets `EMBED_DEVICE=RERANK_DEVICE=cuda`.
 Verify the API sees the GPU:
 
@@ -131,7 +131,9 @@ Embeddings run on Voyage's API, so `EMBED_DEVICE` / `RERANK_DEVICE` are irreleva
 
 | Symptom | Fix |
 |---|---|
-| `torch.cuda.is_available()` is `False` in Docker | Install the NVIDIA Container Toolkit; confirm `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`. |
-| Native GPU not used | `nvidia-smi` must work; reinstall torch with `--index-url https://download.pytorch.org/whl/cu124`. |
+| `torch.cuda.is_available()` is `False` in Docker | Install the NVIDIA Container Toolkit; confirm `docker run --rm --gpus all nvidia/cuda:12.8.1-base-ubuntu22.04 nvidia-smi`. |
+| Native GPU not used | `nvidia-smi` must work; reinstall torch with `--index-url https://download.pytorch.org/whl/cu128`. |
+| `no kernel image is available for execution on the device` | The torch build predates your GPU. Blackwell (RTX 50-series) is `sm_120` and needs cu128; check with `python -c "import torch; print(torch.version.cuda, torch.cuda.get_device_capability())"`. |
+| `.venv` activate script missing | The venv was built on another OS (Linux `bin/` vs Windows `Scripts/`). Delete `.venv` and re-run the setup script. |
 | Out of GPU memory | Use a smaller Ollama model (e.g. `llama3.1:8b` → quantized), or set `RERANK_ENABLED=false`. |
 | OCR does nothing | Tesseract/Poppler not on PATH (native) — see `scripts/install-ocr.sh` or the Windows links above. |
