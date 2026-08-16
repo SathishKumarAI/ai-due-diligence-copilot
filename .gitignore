@@ -33,3 +33,8 @@ data/embeddings/
 # models into one series. The curated narrative that belongs to the repo is
 # docs/RUN-LOG.md; this is the raw append-only log behind it.
 data/runs.jsonl
+# Ragas-generated questions (scripts/generate_testset.py). Regenerable, and deliberately
+# not committed: it is unverified LLM output, and a file sitting in eval/ next to the
+# hand-written qa_dataset.jsonl reads as an endorsed dataset. Generate it, read it, use
+# it — do not let it accrete authority by being checked in.
+eval/qa_generated.jsonl

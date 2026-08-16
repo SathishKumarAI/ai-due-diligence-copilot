@@ -35,6 +35,18 @@ financials"), no multi-hop questions, no adversarial or ambiguous ones, and exac
 refusal case. A change that improved fact lookup while destroying synthesis would show up
 as an improvement.
 
+This is not hypothetical. `scripts/generate_testset.py` now generates questions from the
+corpus, and the first four included two genuine multi-hop ones. The single question that
+failed faithfulness was the synthesis question — *"how does the data analysis in the
+Series B pitch support their request for a $40M investment at a $220M post-money
+valuation?"* — while every single-fact question passed. The hand-written set scores this
+pipeline at 70–80% and structurally cannot see the case it is weakest at.
+
+Generated questions are kept in a separate, gitignored file. They are useful in bulk and
+unreliable individually: the local 8B model writes its own ground truth, and Ragas returns
+the context *text* rather than the file it came from, so those rows carry no
+`expected_source` and are excluded from the hit-rate rather than counted as misses.
+
 **Consequence:** `chunk_size=400` was chosen on this evidence. The sweep showed 120
 scoring 10/10 and it was rejected precisely because the benchmark is biased toward tiny
 chunks. That reasoning is sound but it is still a judgement made without the data that

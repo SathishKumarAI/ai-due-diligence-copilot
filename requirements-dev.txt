@@ -8,3 +8,10 @@ pre-commit>=3,<5
 
 # --- eval/observability (dev only) ---
 ragas>=0.2,<1
+# Undeclared ragas dependency, not a choice. Its testset generator builds a knowledge
+# graph whose default transforms include OverlapScoreBuilder, which imports rapidfuzz at
+# construction; ragas does not declare it, so `pip install ragas` gives you a
+# TestsetGenerator that raises ImportError the moment you call it. Same failure shape as
+# arize-phoenix importing pytz without declaring it (ADR 0003) - pinned here so the next
+# person does not rediscover it.
+rapidfuzz>=3,<4
