@@ -88,7 +88,22 @@ _META_RE = re.compile(
 # Split on sentence enders only when the next chunk starts like a new sentence, so
 # "$12.4M." and "Inc." do not fragment a claim mid-figure.
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(\[])")
-_MARKER_RE = re.compile(r"\[(\d+)\]")
+# Citation markers. Models group them as "[1, 2, 3]" and "[1][2]" as often as they
+# write "[1]", and matching only the last form is not cosmetic: an answer citing
+# "[1, 2, 3, 4, 5]" parsed as *no markers at all*, which sent _citations down its
+# fallback path (returning every retrieved chunk) and left the digits in the claim
+# text for the grounding scorer, tanking its coverage. Observed live.
+_MARKER_RE = re.compile(r"\[\s*(\d+(?:\s*[,;]\s*\d+)*)\s*\]")
+
+
+def parse_markers(text: str) -> list[int]:
+    """Every citation index in ``text``, flattening grouped markers like "[1, 2, 3]"."""
+    out: list[int] = []
+    for group in _MARKER_RE.findall(text):
+        out.extend(int(n) for n in re.split(r"[,;]", group) if n.strip())
+    return out
+
+
 _BULLET_PREFIX = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 
 
@@ -164,7 +179,7 @@ def split_claims(answer: str) -> list[tuple[str, list[int]]]:
         if not line:
             continue
         for sentence in _SENTENCE_SPLIT.split(line):
-            markers = [int(m) for m in _MARKER_RE.findall(sentence)]
+            markers = parse_markers(sentence)
             text = _tidy(_MARKER_RE.sub("", sentence))
             if text:
                 claims.append((text, markers))

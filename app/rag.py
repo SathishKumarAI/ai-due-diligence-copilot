@@ -9,7 +9,6 @@ switch and offline testing possible: tests inject fakes for every collaborator.
 
 from __future__ import annotations
 
-import re
 import time
 from dataclasses import dataclass, field
 
@@ -23,7 +22,8 @@ from app.prompts import CONDENSE_PROMPT, SYSTEM_PROMPT
 from app.rerank import NoOpReranker, Reranker
 from app.retrieval import DenseRetriever, HybridRetriever, Retriever
 
-_MARKER_RE = re.compile(r"\[(\d+)\]")
+# Marker parsing lives in app.grounding so the two cannot drift; a citation the
+# engine recognises must be one the verifier recognises.
 _SNIPPET_LEN = 280
 
 
@@ -138,7 +138,7 @@ class RagEngine:
         is a claim that a source supports something; attaching four to an answer that
         supports nothing inverts the product's central promise.
         """
-        used = {int(m) for m in _MARKER_RE.findall(answer_text)}
+        used = set(_grounding.parse_markers(answer_text))
         if not used and _grounding.asserts_nothing(answer_text):
             return []
         indices = sorted(used) if used else list(range(1, len(docs) + 1))

@@ -173,3 +173,32 @@ def test_a_real_claim_alongside_a_hedge_is_still_scored():
     assert report.grounded == 1
     assert report.score == 1.0  # the hedge is excluded from the denominator
     assert report.verdict == "grounded"
+
+
+# --- grouped citation markers ------------------------------------------------------
+
+
+def test_parse_markers_handles_every_form_a_model_emits():
+    from app.grounding import parse_markers
+
+    # The failure this catches: llama3.1:8b wrote "[1, 2, 3, 4, 5]" and the old regex
+    # \[(\d+)\] matched none of it. _citations then took its no-markers fallback and
+    # returned every retrieved chunk, and the digits stayed in the claim text and
+    # dragged its coverage down. Observed against a live answer.
+    assert parse_markers("x [1] y") == [1]
+    assert parse_markers("x [1, 2, 3] y") == [1, 2, 3]
+    assert parse_markers("x [1][2] y") == [1, 2]
+    assert parse_markers("x [1; 2] y") == [1, 2]
+    assert parse_markers("x [ 3 ] y") == [3]
+    assert parse_markers("no markers here") == []
+
+
+def test_grouped_markers_are_stripped_from_the_claim_text():
+    claims = split_claims("Runway is 512 months [1, 2, 3, 4, 5].")
+    assert claims == [("Runway is 512 months.", [1, 2, 3, 4, 5])]
+
+
+def test_grouped_markers_produce_one_citation_each(fake_engine):
+    fake_engine.llm.reply = "Everything agrees [1, 2]."
+    cites = fake_engine.answer("q").citations
+    assert [c.marker for c in cites] == [1, 2]
