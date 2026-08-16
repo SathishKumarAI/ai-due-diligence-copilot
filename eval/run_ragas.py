@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # noqa: E402
 from app.main import build_engine  # noqa: E402
+from scripts.run_log import record_run  # noqa: E402
 
 FAITHFULNESS_THRESHOLD = 0.70
 CONTEXT_PRECISION_THRESHOLD = 0.70
@@ -149,6 +150,14 @@ def main() -> int:
         "context_precision": CONTEXT_PRECISION_THRESHOLD,
         "context_recall": CONTEXT_RECALL_THRESHOLD,
     }
+    # Recorded before the verdict, so a run that measured nothing is still visible in the
+    # history as a gap rather than simply absent.
+    record_run(
+        "ragas",
+        {name: round(value, 3) for name, value in scores.items()},
+        extra={"questions": len(samples), "gated": args.gate},
+    )
+
     below_threshold = False
     unmeasured = False
     for name, threshold in thresholds.items():

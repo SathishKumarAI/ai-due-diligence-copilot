@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # noqa: E402
 from app.main import build_engine  # noqa: E402
+from scripts.run_log import record_run  # noqa: E402
 
 HIT_RATE_THRESHOLD = 0.7
 FAITHFULNESS_THRESHOLD = 0.7
@@ -97,6 +98,15 @@ def main() -> int:
     print(f"Faithfulness       : {faithfulness:.0%}  (threshold {FAITHFULNESS_THRESHOLD:.0%})")
 
     ok = hit_rate >= HIT_RATE_THRESHOLD and faithfulness >= FAITHFULNESS_THRESHOLD
+
+    # Recorded whether it passed or failed. A history that only keeps the good runs
+    # cannot show a regression, which is the only thing the history is for.
+    record_run(
+        "eval",
+        {"hit_rate": round(hit_rate, 3), "faithfulness": round(faithfulness, 3)},
+        extra={"questions": n, "passed": ok},
+    )
+
     print("\nPASS" if ok else "\nFAIL")
     return 0 if ok else 1
 

@@ -36,6 +36,7 @@ from app.providers import get_embeddings, get_llm  # noqa: E402
 from app.rag import RagEngine  # noqa: E402
 from app.rerank import build_reranker  # noqa: E402
 from app.retrieval import build_retriever  # noqa: E402
+from scripts.run_log import record_run  # noqa: E402
 
 
 @dataclass
@@ -78,15 +79,28 @@ def build(store, llm, cfg: Config) -> RagEngine:  # noqa: ANN001
         reranker=build_reranker(tuned),
         fetch_k=tuned.retrieve_fetch_k,
         history_max_turns=tuned.history_max_turns,
+        # Omitted when the source-diversity cap was added, which silently made every
+        # config here uncapped — so the tool for deciding what ships was comparing a
+        # retrieval stack that does not ship.
+        max_chunks_per_source=tuned.max_chunks_per_source,
     )
 
 
-def run_question(store, llm, question: str, cfgs: list[Config], show_prompt: bool) -> None:  # noqa: ANN001
+def run_question(
+    store, llm, question: str, cfgs: list[Config], show_prompt: bool
+) -> dict[str, float]:  # noqa: ANN001
+    """Print the per-config comparison, and return each config's grounding score.
+
+    The scores are returned rather than only printed so main() can record the run: a
+    comparison whose result only ever reached the terminal could not be compared against
+    the next one, which is the whole point of running it.
+    """
     print(f"\n{'=' * 78}\nQ: {question}\n{'=' * 78}")
     header = f"{'config':<16} {'sources retrieved':<44} {'ctx':>6} {'grounding':>22}"
     print(header)
     print("-" * len(header))
 
+    scores: dict[str, float] = {}
     for cfg in cfgs:
         engine = build(store, llm, cfg)
         answer, trace = engine.answer_with_trace(question, verify=True)
@@ -96,6 +110,8 @@ def run_question(store, llm, question: str, cfgs: list[Config], show_prompt: boo
             f"{g.verdict} {g.score:.2f} (g{g.grounded}/w{g.weak}/u{g.unsupported})" if g else "-"
         )
         print(f"{cfg.label:<16} {sources[:44]:<44} {trace.context_char_len:>6} {verdict:>22}")
+        if g:
+            scores[cfg.label] = g.score
 
         if show_prompt:
             print(f"\n--- prompt under {cfg.label} ---\n{trace.user_prompt}\n")
@@ -107,6 +123,8 @@ def run_question(store, llm, question: str, cfgs: list[Config], show_prompt: boo
                     f" figures={claim.unsupported_figures}" if claim.unsupported_figures else ""
                 )
                 print(f"{'':<16} !! unsupported: {claim.text[:60]}{figures}")
+
+    return scores
 
 
 def main() -> int:
@@ -138,8 +156,18 @@ def main() -> int:
 
     print(f"provider={settings.provider} model={settings.ollama_llm_model}")
     print(f"comparing {len(cfgs)} configs over {len(questions)} question(s)")
+    per_config: dict[str, list[float]] = {}
     for question in questions:
-        run_question(store, llm, question, cfgs, args.show_prompt)
+        for label, score in run_question(store, llm, question, cfgs, args.show_prompt).items():
+            per_config.setdefault(label, []).append(score)
+
+    # Metric names carry the config label because that is exactly what varies here — the
+    # run's global config snapshot describes the index, not the configs being compared.
+    record_run(
+        "simulate",
+        {f"grounding[{label}]": round(sum(v) / len(v), 3) for label, v in per_config.items() if v},
+        extra={"questions": len(questions), "configs": [c.label for c in cfgs]},
+    )
     return 0
 
 
