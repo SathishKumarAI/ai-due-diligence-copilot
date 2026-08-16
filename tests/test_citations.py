@@ -50,3 +50,27 @@ def test_no_results_returns_guardrail():
     result = engine.answer("unknown")
     assert "do not cover" in result.answer
     assert result.citations == []
+
+
+def test_refusal_carries_no_citations(fake_engine):
+    # Running the app produced exactly this: "The provided documents do not cover this."
+    # returned with four citations attached, because the no-marker fallback fired. A
+    # citation asserts a source supports something; a refusal supports nothing.
+    fake_engine.llm.reply = "The provided documents do not cover this. No mention of Tesla."
+    assert fake_engine.answer("What were Tesla's deliveries?").citations == []
+
+
+def test_soft_refusal_carries_no_citations(fake_engine):
+    # The guardrail phrase is not the only way a model declines.
+    fake_engine.llm.reply = (
+        "I cannot provide an estimate of 2027 revenue as it is not mentioned in the "
+        "provided passages. If you'd like to know more, let me know."
+    )
+    assert fake_engine.answer("Estimate 2027 revenue").citations == []
+
+
+def test_uncited_but_substantive_answer_keeps_its_provenance(fake_engine):
+    # The fallback still matters: a model that answers correctly but forgets its markers
+    # should not lose provenance. Only non-assertions are stripped.
+    fake_engine.llm.reply = "The post-money valuation is $220,000,000."
+    assert len(fake_engine.answer("valuation?").citations) == 3

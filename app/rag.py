@@ -130,10 +130,17 @@ class RagEngine:
     def _citations(self, answer_text: str, docs: list[Document]) -> list[Citation]:
         """Return citations for the markers the answer actually used.
 
-        Falls back to all retrieved chunks if the model emitted no markers, so the
-        caller always gets a traceable source list.
+        Falls back to all retrieved chunks when the model emitted no markers, so an
+        answer that forgot to cite still carries provenance — *unless* the answer asserts
+        nothing. Running the app surfaced the failure that motivated the exception: a
+        refusal came back reading "The provided documents do not cover this" with four
+        citations attached, because the fallback fired on the absent markers. A citation
+        is a claim that a source supports something; attaching four to an answer that
+        supports nothing inverts the product's central promise.
         """
         used = {int(m) for m in _MARKER_RE.findall(answer_text)}
+        if not used and _grounding.asserts_nothing(answer_text):
+            return []
         indices = sorted(used) if used else list(range(1, len(docs) + 1))
         out: list[Citation] = []
         for i in indices:
