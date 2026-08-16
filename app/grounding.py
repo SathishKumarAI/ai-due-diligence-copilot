@@ -131,6 +131,26 @@ def is_refusal(answer: str) -> bool:
     return answer.strip().lower().startswith(REFUSAL_PREFIX)
 
 
+def asserts_nothing(answer: str) -> bool:
+    """True when the answer makes no factual claim about the corpus.
+
+    Covers the explicit guardrail *and* soft refusals — "I cannot provide an estimate…",
+    a bare "Here are the answers:" — where every sentence is a hedge, an offer of help or
+    a lead-in. Used by the engine to decide whether attaching citations would be honest:
+    a citation asserts that a source supports something, and an answer that supports
+    nothing must not carry any.
+    """
+    if is_refusal(answer):
+        return True
+    claims = split_claims(answer)
+    if not claims:
+        return True
+    return all(
+        _META_RE.search(text) or text.rstrip().endswith(":") or not _content_terms(text)
+        for text, _ in claims
+    )
+
+
 def split_claims(answer: str) -> list[tuple[str, list[int]]]:
     """Break an answer into (claim text, cited markers) pairs.
 
