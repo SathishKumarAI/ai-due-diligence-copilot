@@ -10,6 +10,7 @@ Usage:
 
 Deterministic given a seed: no LLM, no network — templates + a seeded RNG.
 """
+
 from __future__ import annotations
 
 import argparse

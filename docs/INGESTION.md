@@ -204,11 +204,32 @@ Design notes: **stdlib only** (`urllib`, no new dependency); **idempotent** (ski
 already present); **polite** (sends the SEC-required descriptive User-Agent, rate-limited
 to well under 10 req/s); **offline-safe** (network errors are logged and skipped, never
 fatal); **provenance** (every download is recorded in `data/SOURCES.md` with its URL).
-Default companies: AAPL, MSFT, AMZN, GOOGL, NVDA. Set a contact per SEC guidelines:
+Default companies: AAPL, MSFT, AMZN, GOOGL, NVDA.
+
+### `SEC_USER_AGENT` is required — there is no working default
+
+SEC EDGAR returns **403 for every request** whose User-Agent does not carry a real
+contact email, so the fetcher refuses to start without one (exit code 2):
 
 ```bash
-SEC_USER_AGENT="my-project (github.com/you)" python scripts/fetch_corpus.py
+export SEC_USER_AGENT="Jane Roe jane@example.com"    # bash
+$env:SEC_USER_AGENT = "Jane Roe jane@example.com"    # PowerShell
+python scripts/fetch_corpus.py
 ```
+
+Measured against `data.sec.gov/submissions/CIK0000320193.json` on 2026-08-16:
+
+| User-Agent | Result |
+|---|---|
+| `rag-learning-companion (github.com/SathishKumarAI)` | **403** |
+| `RAG Learning Companion SathishKumarAI@users.noreply.github.com` | **403** |
+| `rag-learning-companion acme@example.com` | 200 |
+| `RAG Learning Companion acme@example.com` | 200 |
+
+Two consequences worth knowing before you debug this yourself: a handle-only UA can
+never work, and **`users.noreply.github.com` is blocked by SEC**, so this is the one
+place in the repo that cannot reuse the project's GitHub noreply identity. No contact
+address is committed here, which is why the value has to come from the environment.
 
 The fetcher strips HTML to text itself (tags, script/style, entity-unescape, whitespace)
 and writes `data/corpus/<ticker>_10k.txt`, which then flows through the normal

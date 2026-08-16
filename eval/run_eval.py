@@ -8,18 +8,27 @@ Exits non-zero if either metric falls below its threshold, so CI can gate on it.
 Requires a built index and a reachable provider (Ollama or Claude).
 
     python eval/run_eval.py
+
+The engine comes from ``app.main.build_engine`` — the same constructor the API uses —
+so the numbers describe the retrieval stack that actually ships. An earlier version
+built ``RagEngine`` here with no retriever and no reranker, which silently scored plain
+dense retrieval no matter what RETRIEVAL_MODE said; the config banner below exists so a
+mismatch is visible in the output rather than implied.
 """
+
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 
-from app.cache import wrap_embeddings
-from app.config import settings
-from app.ingest import load_index
-from app.providers import get_embeddings, get_llm
-from app.rag import RagEngine
+# Running this as a script puts eval/ on sys.path, not the repo root, so `import app`
+# raises ModuleNotFoundError. Both the Makefile target and the docstring above invoke it
+# that way, so bootstrap the root rather than change the documented command.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.config import settings  # noqa: E402
+from app.main import build_engine  # noqa: E402
 
 HIT_RATE_THRESHOLD = 0.7
 FAITHFULNESS_THRESHOLD = 0.7
@@ -31,35 +40,53 @@ JUDGE_PROMPT = (
 )
 
 
+def is_grounded(verdict: str) -> bool:
+    """Parse the judge's verdict, failing closed.
+
+    A bare ``"GROUNDED" in verdict`` also matched "NOT GROUNDED", so a chatty judge
+    scored its own rejections as passes. Anything that is not an unambiguous GROUNDED
+    now counts against the metric.
+    """
+    v = verdict.strip().upper()
+    if "UNSUPPORTED" in v or "NOT GROUNDED" in v:
+        return False
+    return "GROUNDED" in v
+
+
 def main() -> int:
     dataset = Path(__file__).parent / "qa_dataset.jsonl"
     rows = [json.loads(line) for line in dataset.read_text().splitlines() if line.strip()]
 
-    embeddings = wrap_embeddings(get_embeddings(settings), settings)
-    store = load_index(settings, embeddings)
-    llm = get_llm(settings)
-    engine = RagEngine(store, llm, top_k=settings.top_k, provider=settings.provider)
+    engine = build_engine()
+    llm = engine.llm
 
     hits = 0
     grounded = 0
-    print(f"Running {len(rows)} eval questions (provider={settings.provider})\n")
+    print(f"Running {len(rows)} eval questions")
+    print(
+        f"  provider={settings.provider} model={settings.ollama_llm_model} "
+        f"retrieval={settings.retrieval_mode} rerank={settings.rerank_enabled} "
+        f"top_k={settings.top_k}\n"
+    )
     for row in rows:
         q, expected_src = row["question"], row["expected_source"]
-        docs = engine._retrieve(q, settings.top_k)
-        retrieved_srcs = {d.metadata.get("source") for d in docs}
+
+        # One pass: the hit-rate, the judged context and the answer all come from the
+        # same retrieval, so the metrics cannot describe a different draw than the one
+        # that produced the answer.
+        answer, trace = engine.answer_with_trace(q)
+        retrieved_srcs = {c.source for c in trace.retrieved}
         hit = expected_src in retrieved_srcs
         hits += hit
 
-        result = engine.answer(q, settings.top_k)
-        context = "\n\n".join(d.page_content for d in docs)
         verdict = llm.invoke(
-            JUDGE_PROMPT.format(context=context, answer=result.answer)
+            JUDGE_PROMPT.format(context=trace.user_prompt, answer=answer.answer)
         ).content
-        is_grounded = "GROUNDED" in str(verdict).upper()
-        grounded += is_grounded
+        judged = is_grounded(str(verdict))
+        grounded += judged
 
-        flag = "✓" if hit else "✗"
-        gflag = "✓" if is_grounded else "✗"
+        flag = "OK  " if hit else "MISS"
+        gflag = "OK  " if judged else "FAIL"
         print(f"  [retrieval {flag}] [faithful {gflag}] {q}")
 
     n = len(rows)
