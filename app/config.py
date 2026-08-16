@@ -41,8 +41,24 @@ class Settings(BaseSettings):
     voyage_model: str = "voyage-3.5"
 
     # --- retrieval / generation ---
-    chunk_size: int = 1000
-    chunk_overlap: int = 150
+    # 400, not 1000. At 1000 every document in data/ fit inside a single chunk, so one
+    # chunk was one document and each vector was a document-level average — a single line
+    # like "Gross margin: 61%" was averaged into a whole pitch deck and the question
+    # about it ranked that chunk 4th of 4. Measured, scoring dense retrieval against the
+    # eval ground truth with no LLM in the loop:
+    #
+    #   chunk_size  chunks  dense hit@1  mean rank of expected
+    #         1000       4         8/10                   1.40
+    #          400      11         9/10                   1.10
+    #          120      38        10/10                   1.00
+    #
+    # 120 scores best and is the wrong choice: every eval question is a single-fact
+    # lookup, which structurally favours tiny chunks, and at top_k=5 it leaves the model
+    # ~600 characters of context to answer from. 400 fixes the failure that mattered,
+    # keeps ~2000 characters of context, and makes the retrieval hit-rate meaningful for
+    # the first time (11 chunks against top_k=5 can actually miss; 4 could not).
+    chunk_size: int = 400
+    chunk_overlap: int = 80
     top_k: int = 5
     max_tokens: int = 2000
 
