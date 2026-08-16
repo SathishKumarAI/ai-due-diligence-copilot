@@ -1,0 +1,23 @@
+# Vulnerabilities deliberately not blocking CI. Every entry needs a reason and a date;
+# an ignore file without them becomes a place where findings go to be forgotten.
+#
+# Scope note: this suppresses the *gate*, not the report. Trivy still prints these.
+
+# CVE-2026-34070 — HIGH — langchain-core 0.3.86, path traversal in the legacy
+# langchain_core.prompts.loading helpers (load_prompt and friends read file paths out of
+# a deserialized config dict without validating traversal or absolute paths).
+#
+# Not reachable here. This project has no call to load_prompt, load_chain, or anything in
+# prompts.loading — verified by grep across every .py file. Prompts are string constants
+# in app/prompts.py and are never deserialized from user input or from disk. The
+# vulnerability needs an application that loads prompt configs from an untrusted source.
+#
+# The fix is langchain-core 1.2.22, i.e. the 0.3 -> 1.x major upgrade across langchain,
+# langchain-community, langchain-chroma, langchain-ollama, langchain-huggingface,
+# langchain-anthropic and langchain-text-splitters. That is a migration, not a version
+# bump, and doing it under a CI gate for an unreachable finding is how a security control
+# gets disabled rather than satisfied.
+#
+# Revisit: with the langchain 1.x migration, or immediately if this project ever calls
+# load_prompt. Added 2026-08-16.
+CVE-2026-34070

@@ -84,6 +84,14 @@ strong smoke detector and it is not a proof.
   friends. A model phrasing a refusal differently is scored as an unsupported claim.
 - **English only.** The tokenizer is `\$?[a-z0-9]+(?:[.,%$][a-z0-9]+)*%?` — no CJK, and
   accented characters split words apart.
+- **OCR'd text can make a correct answer score as unsupported.** Measured: an image
+  uploaded through `/v1/upload` was OCR'd as `"gross margin is73 percent"` and
+  `"Zeta Dynamicsemploys 412 peop!"` — spaces dropped, a word mangled. The answer was
+  right and the verdict was `unsupported`, because `73` really is absent as a token from
+  `is73`. The grounding check is behaving correctly; the input is damaged. The same
+  damage silently degrades **BM25 lexical retrieval**, which cannot match a query token
+  against a word it is fused to. No cleaning rule splits letter–digit boundaries, and
+  adding one is not obviously safe: it would also split `FY2026`, `H100` and `3M`.
 
 ---
 

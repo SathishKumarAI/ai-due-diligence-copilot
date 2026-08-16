@@ -332,7 +332,7 @@ pathspec==1.1.1
     # via mypy
 pdf2image==1.17.0
     # via -r requirements.txt
-pillow==11.3.0
+pillow==12.3.0
     # via
     #   -r requirements.txt
     #   pdf2image
@@ -390,7 +390,7 @@ pygments==2.20.0
     # via
     #   pytest
     #   rich
-pypdf==5.9.0
+pypdf==6.16.1
     # via -r requirements.txt
 pypika==0.51.1
     # via chromadb
@@ -428,6 +428,8 @@ pyyaml==6.0.3
     #   transformers
     #   uvicorn
 ragas==0.4.3
+    # via -r requirements-dev.txt
+rapidfuzz==3.14.5
     # via -r requirements-dev.txt
 referencing==0.37.0
     # via

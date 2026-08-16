@@ -256,7 +256,7 @@ packaging==25.0
     #   transformers
 pdf2image==1.17.0
     # via -r requirements.txt
-pillow==11.3.0
+pillow==12.3.0
     # via
     #   -r requirements.txt
     #   pdf2image
@@ -298,7 +298,7 @@ pydantic-settings==2.15.0
     #   langchain-community
 pygments==2.20.0
     # via rich
-pypdf==5.9.0
+pypdf==6.16.1
     # via -r requirements.txt
 pypika==0.51.1
     # via chromadb
