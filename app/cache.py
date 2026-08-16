@@ -8,6 +8,7 @@ Two layers:
 Both are backed by diskcache so they survive restarts. Disabled cleanly when
 settings.cache_enabled is False.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,9 +28,7 @@ def wrap_embeddings(embeddings: Embeddings, settings: Settings) -> Embeddings:
         return embeddings
     store = LocalFileStore(str(settings.cache_dir / "embeddings"))
     namespace = f"{settings.provider}:{settings.hf_embed_model}:{settings.voyage_model}"
-    return CacheBackedEmbeddings.from_bytes_store(
-        embeddings, store, namespace=namespace
-    )
+    return CacheBackedEmbeddings.from_bytes_store(embeddings, store, namespace=namespace)
 
 
 class AnswerCache:

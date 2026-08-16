@@ -17,7 +17,11 @@ ignore = ["E501"]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12, matching what actually runs: CI uses 3.12, both Dockerfiles install python3.12.
+# Under 3.11 mypy rejects its own dependency stubs — numpy >=2.5 writes PEP 695 `type`
+# aliases, giving "Type statement is only supported in Python 3.12 and greater" before
+# a single line of app/ is checked.
+python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_ignores = false
 disallow_untyped_defs = false

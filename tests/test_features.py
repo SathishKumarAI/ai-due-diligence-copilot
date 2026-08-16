@@ -26,7 +26,9 @@ from app.retrieval import (
 def test_bm25_ranks_exact_term_match_first():
     # Domain-neutral so this engine test is identical across all three repos.
     docs = [
-        Document(page_content="the exact term appears here in this passage", metadata={"source": "a"}),
+        Document(
+            page_content="the exact term appears here in this passage", metadata={"source": "a"}
+        ),
         Document(page_content="an unrelated passage about other topics", metadata={"source": "b"}),
     ]
     bm25 = BM25Index(docs)

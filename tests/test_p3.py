@@ -18,7 +18,6 @@ from app.cleaning import (
 )
 from app.trace import chunk_traces, dense_scores, tokenize_trace
 
-
 # --- F21 cleaning ---------------------------------------------------------------
 
 
@@ -40,7 +39,10 @@ def test_clean_text_can_disable_steps():
 
 def test_clean_documents_strips_running_headers():
     pages = [
-        Document(page_content=f"ACME CONFIDENTIAL\nPage body {i}\nFooter X", metadata={"source": "a.pdf", "page": i})
+        Document(
+            page_content=f"ACME CONFIDENTIAL\nPage body {i}\nFooter X",
+            metadata={"source": "a.pdf", "page": i},
+        )
         for i in range(1, 6)
     ]
     cleaned = clean_documents(pages)

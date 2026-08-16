@@ -16,7 +16,10 @@ from typing import Protocol
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[.,%$][a-z0-9]+)*")
+# The leading `\$?` and trailing `%?` matter: `[.,%$]` only joins a symbol that has
+# more alphanumerics after it, so without them "$5" tokenized to "5" and "40%" to "40",
+# dropping the sign that carries the meaning in a financial corpus.
+_TOKEN_RE = re.compile(r"\$?[a-z0-9]+(?:[.,%$][a-z0-9]+)*%?")
 
 
 def _tokenize(text: str) -> list[str]:

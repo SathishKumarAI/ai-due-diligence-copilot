@@ -79,7 +79,7 @@ class AskResponse(BaseModel):
     cached: bool = False
     timings_ms: dict[str, float] = Field(default_factory=dict)
     trace: PipelineTraceModel | None = Field(
-        None, description="Pipeline trace, present only when explain=true (F23)."
+        default=None, description="Pipeline trace, present only when explain=true (F23)."
     )
 
 

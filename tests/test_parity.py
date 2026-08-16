@@ -20,7 +20,9 @@ MANIFEST = REPO_ROOT / "ENGINE_MANIFEST.sha256"
 
 
 def test_engine_files_match_manifest():
-    assert MANIFEST.exists(), "Missing ENGINE_MANIFEST.sha256 — run scripts/sync_engine.py --manifest-only"
+    assert MANIFEST.exists(), (
+        "Missing ENGINE_MANIFEST.sha256 — run scripts/sync_engine.py --manifest-only"
+    )
     for line in MANIFEST.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue

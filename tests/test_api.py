@@ -3,6 +3,7 @@
 We stop the real engine from being built at startup (it would download an
 embedding model) and inject the fake engine through the dependency override.
 """
+
 from __future__ import annotations
 
 import pytest

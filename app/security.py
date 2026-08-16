@@ -4,6 +4,7 @@
   setup runs key-free locally, but production can require X-API-Key).
 - Rate limiting: in-memory token bucket per key (or client IP if no key).
 """
+
 from __future__ import annotations
 
 import time
@@ -35,9 +36,7 @@ class TokenBucket:
         now = time.monotonic()
         elapsed = now - self._last[key]
         self._last[key] = now
-        self._tokens[key] = min(
-            self.capacity, self._tokens[key] + elapsed * self.refill_per_sec
-        )
+        self._tokens[key] = min(self.capacity, self._tokens[key] + elapsed * self.refill_per_sec)
         if self._tokens[key] >= 1.0:
             self._tokens[key] -= 1.0
             return True
