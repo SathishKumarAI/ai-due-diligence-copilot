@@ -242,12 +242,61 @@ say much. Another thing that gets interesting only on a real corpus.
 
 ---
 
+## 5b. What this corpus can and cannot show — measured
+
+Worth being blunt, because it decides whether opening the viewer is worth your time.
+
+**The four documents are barely distinguishable from each other.** Pairwise cosine
+between chunk vectors:
+
+```
+inter-document cosine: min 0.82  mean 0.84  max 0.86
+```
+
+Every document is about equally similar to every other. They are all short synthetic
+notes about the same fictional company, sharing most of their vocabulary, so they occupy
+one tight region rather than four separable clusters. **A picture of this shows one
+blob.** It also explains the 8/10 result better than any diagram: dense retrieval is
+choosing between vectors that sit 0.84 apart on a scale where 1.0 is identical, so small
+wording differences flip the winner.
+
+**A 3D projection discards most of the space.**
+
+```
+PCA 3D keeps 14.2% of variance   (10D keeps 30.3%)
+dimensions needed for 90%: 106 of 384
+```
+
+Six sevenths of the information is gone before anything reaches the screen. Two points
+looking adjacent is weak evidence; the projector's nearest-neighbour panel computes in
+the full 384 dimensions and is the only thing here worth trusting for distance.
+
+**Honest consequence:** on this corpus, everything useful learned so far came from the
+*exported numbers* — hit rate, `expected_rank`, chunk sizes, inter-document cosine — not
+from looking at the cloud. The visual half of this feature is waiting on a real corpus.
+The export is useful today; the picture is useful later. Section 6 says when.
+
 ## 6. Caveats
 
-- **384 dimensions do not fit in 3.** PCA here describes about **16.9%** of the
-  variance. Two points looking close on screen is a hint, not a fact. The retriever works
-  in the full space, and the projector's own nearest-neighbour panel reports true
-  distances there — trust that panel over your eyes.
+- **384 dimensions do not fit in 3.** PCA describes roughly **14–17%** of the variance
+  here (it moves with the point set), and 90% needs 106 dimensions. Two points looking
+  close on screen is a hint, not a fact. The retriever works in the full space, and the
+  projector's nearest-neighbour panel reports true distances there — trust that panel
+  over your eyes.
+
+### When this feature starts earning its keep
+
+It is worth opening the viewer when at least one of these is true:
+
+| Condition | Why it matters |
+|---|---|
+| **Hundreds of chunks, not four** | Cluster structure needs enough points to have structure. Below ~100 the projection is noise. |
+| **Documents that actually differ** | If inter-document cosine sits near 0.84 as it does here, there is nothing to separate. Mixed corpora (filings + emails + contracts) separate; four notes about one company do not. |
+| **Documents span many chunks** | With one chunk per document you are looking at a document map, not a passage map, and passage-level retrieval is what the pipeline does. |
+| **You are asking "why wasn't X found?"** | Locate the chunk, look at what surrounds it, and see which region the query landed in instead. |
+| **You just ingested an unfamiliar corpus** | `origin` and the cluster shape tell you whether it landed coherently before you trust any answer from it. |
+
+Until then, run the exporter for the numbers it prints and skip the viewer.
 - **The corpus is four synthetic documents plus whatever you have uploaded.** The map is
   legible but not yet interesting. It needs a real corpus, which needs `SEC_USER_AGENT`
   (see `docs/INGESTION.md`).
