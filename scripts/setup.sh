@@ -11,6 +11,13 @@ GPU=0
 cd "$(dirname "$0")/.."
 
 PY=${PYTHON:-python3}
+# A venv built on Windows has Scripts/ instead of bin/, and `python -m venv` will not repair
+# it. Fail loudly instead of dying on the source line.
+if [[ -d .venv && ! -f .venv/bin/activate ]]; then
+  echo "ERROR: a .venv exists but has no bin/activate — it was built on another platform. Delete it and re-run." >&2
+  exit 1
+fi
+
 echo "==> Creating venv (.venv) with $("$PY" --version)"
 "$PY" -m venv .venv
 # shellcheck disable=SC1091
@@ -21,8 +28,10 @@ if [[ $GPU -eq 1 ]]; then
   if [[ "$(uname -s)" == "Darwin" ]]; then
     echo "==> macOS: no CUDA. torch MPS ships in the default wheel — set EMBED_DEVICE=auto (uses mps)."
   else
-    echo "==> Installing CUDA torch (cu124)"
-    pip install torch --index-url https://download.pytorch.org/whl/cu124
+    # cu128, not cu124: Blackwell (RTX 50-series) is sm_120, and cu124 wheels ship no sm_120
+    # kernels — torch imports fine, then fails at the first CUDA op. cu128 covers sm_75..sm_120.
+    echo "==> Installing CUDA torch (cu128)"
+    pip install torch --index-url https://download.pytorch.org/whl/cu128
     if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi -L; else
       echo "WARN: nvidia-smi not found — install the NVIDIA driver, or run CPU mode."
     fi
