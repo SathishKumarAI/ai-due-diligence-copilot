@@ -45,6 +45,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 What&apos;s New
               </Link>
+              {siteConfig.embeddingMapUrl && (
+                <a
+                  href={siteConfig.embeddingMapUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="3D map of the vector space this app searches (a static export — see docs/EMBEDDING-MAP.md)"
+                  className="hidden rounded-lg px-2.5 py-1.5 transition hover:opacity-70 sm:inline muted"
+                >
+                  Embedding map
+                </a>
+              )}
               <a
                 href={`https://github.com/${siteConfig.githubRepo}`}
                 target="_blank"

@@ -24,3 +24,6 @@ data/feedback.jsonl
 # data/SOURCES.md is deliberately NOT ignored — it is the provenance and licence record
 # for a public repo and should travel with it.
 data/corpus/
+# Exported vector space for the Embedding Projector (F26): derived from the index,
+# regenerate with scripts/export_embeddings.py. A few MB of floats, not source.
+data/embeddings/
