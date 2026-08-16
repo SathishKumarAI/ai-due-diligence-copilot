@@ -145,6 +145,13 @@ export async function askStream(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
+    // sse-starlette terminates lines with CRLF, so frames arrive separated by
+    // "\r\n\r\n". Splitting on "\n\n" alone never matched: every frame stayed in the
+    // buffer, the whole stream was handed to handleFrame once as a single malformed
+    // frame at end-of-stream, JSON.parse threw, and the catch swallowed it — so the
+    // UI showed a caret and never a single token. Normalise the buffer (not the raw
+    // chunk) so a CR landing on a chunk boundary still pairs with its LF.
+    buffer = buffer.replace(/\r\n/g, "\n");
     let sep: number;
     while ((sep = buffer.indexOf("\n\n")) !== -1) {
       handleFrame(buffer.slice(0, sep));
