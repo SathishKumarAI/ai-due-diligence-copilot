@@ -50,9 +50,22 @@ def wrap_embeddings(embeddings: Embeddings, settings: Settings) -> Embeddings:
 
 
 class AnswerCache:
-    """Tiny TTL cache for full answers. No-op when disabled."""
+    """Tiny TTL cache for full answers. No-op when disabled.
 
-    def __init__(self, settings: Settings) -> None:
+    The key deliberately includes a *corpus fingerprint*. Without one the cache answers
+    from a corpus that no longer exists: re-chunking or ingesting new documents changes
+    every answer the system would give, while the key — provider, question, top_k — stays
+    identical, so the old answer is served indefinitely.
+
+    This is not hypothetical. Running the test suite once poisoned the live cache with
+    fixture responses: the offline tests write to the same ``.cache`` directory, the key
+    was built from ``settings.provider`` ("ollama") while the answer came from a fake
+    engine, and the running app then served "Based on the passages, the answer is
+    grounded [1]." to a real question. The fingerprint plus the model identity below make
+    those keys disjoint; tests also get their own cache directory now.
+    """
+
+    def __init__(self, settings: Settings, corpus_fingerprint: str = "") -> None:
         self.enabled = settings.cache_enabled
         self.ttl = settings.cache_ttl_seconds
         self._cache: Any = None
@@ -61,9 +74,17 @@ class AnswerCache:
 
             self._cache = Cache(str(settings.cache_dir / "answers"))
         self._provider = settings.provider
+        # The generating model matters as much as the provider name: two runs of
+        # "ollama" against different models are not interchangeable answers.
+        self._model = (
+            settings.anthropic_model if settings.provider == "claude" else settings.ollama_llm_model
+        )
+        self._fingerprint = corpus_fingerprint
 
     def _key(self, question: str, top_k: int) -> str:
-        raw = json.dumps([self._provider, question.strip().lower(), top_k])
+        raw = json.dumps(
+            [self._provider, self._model, self._fingerprint, question.strip().lower(), top_k]
+        )
         return hashlib.sha256(raw.encode()).hexdigest()
 
     def get(self, question: str, top_k: int) -> dict | None:

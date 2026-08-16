@@ -67,16 +67,31 @@ def _cache_question(question: str, history: list[schemas.Turn]) -> str:
     return f"{question}\x00{tail}"
 
 
+def _corpus_fingerprint() -> str:
+    """Identify the indexed corpus, so cached answers do not outlive it."""
+    engine = getattr(app.state, "engine", None)
+    if engine is None:
+        return "no-index"
+    try:
+        return f"{settings.collection_name}:{engine.vectorstore._collection.count()}"  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - non-Chroma store; fall back to not caching across restarts
+        return "unknown"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
-    app.state.cache = AnswerCache(settings)
     try:
         app.state.engine = build_engine()
         log.info("engine_ready", provider=settings.provider)
     except Exception as exc:  # noqa: BLE001 - degrade gracefully if not yet ingested
         app.state.engine = None
         log.warning("engine_unavailable", error=str(exc))
+    # Built after the engine so the cache key can carry a corpus fingerprint: an answer
+    # cached against a 4-chunk index must not be served from an 11-chunk one. Chunk count
+    # is coarse — it misses an edit that leaves the count unchanged — but it catches
+    # ingest, upload and re-chunking, which is what actually changes answers.
+    app.state.cache = AnswerCache(settings, corpus_fingerprint=_corpus_fingerprint())
     yield
 
 
