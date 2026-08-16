@@ -61,8 +61,17 @@ export type ClaimVerdict = {
   span_end: number | null;
 };
 
+// Two retrieved sources disagreeing about the same quantity (F27). Distinct from a claim
+// verdict on purpose: claim checking asks "does the answer match its sources", which is
+// silent when the sources themselves conflict.
+export type FigureConflict = {
+  context: string[];
+  values: { value: string; source: string; snippet: string }[];
+};
+
 export type GroundingReport = {
   claims: ClaimVerdict[];
+  conflicts: FigureConflict[];
   grounded: number;
   weak: number;
   unsupported: number;

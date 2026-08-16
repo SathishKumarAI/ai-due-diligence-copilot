@@ -130,6 +130,21 @@ checks the answer against *the retrieved chunks*. When an attacker controls what
 retrieved, a lie is faithfully "grounded". Verification catches a model that strays from
 its sources; it cannot catch sources that are themselves hostile.
 
+**F27 partially covers that blind spot, and only partially.** `find_conflicts` reports
+when two retrieved sources give different values for the same quantity — the 512-months
+document and the real 12.8-months document are flagged against each other, and the UI
+shows it above the claim list. Its limits are real:
+
+- It compares **figures only**. A poisoned *qualitative* claim ("the CTO has resigned")
+  raises nothing.
+- It needs the true document to be **retrieved as well**. If the attacker crowds it out
+  entirely there is nothing to disagree with — which is why the source-diversity cap
+  matters more than this does.
+- It **never says which value is right**, and cannot. It is a flag for a human.
+- Conflicts *within* a single document are not detected, deliberately: neighbouring
+  metrics share almost all their vocabulary, and comparing them produced false positives
+  like "gross margin 61%" against "net revenue retention 118%".
+
 Also true:
 
 - **No PII detection or redaction** anywhere in ingest.

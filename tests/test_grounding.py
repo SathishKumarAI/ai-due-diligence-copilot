@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 
 from app.grounding import (
     GROUNDED_COVERAGE,
+    find_conflicts,
     is_refusal,
     split_claims,
     verify_answer,
@@ -230,3 +231,76 @@ def test_positive_claims_using_the_same_verbs_are_still_checked():
     invented = verify_claim("The term sheet states a valuation of $999,000,000.", [1], [PITCH])
     assert invented.status == "unsupported"
     assert "$999,000,000" in invented.unsupported_figures
+
+
+# --- F27: conflicts between the sources themselves -------------------------------------
+
+
+def _doc(text: str, source: str) -> Document:
+    return Document(page_content=text, metadata={"source": source, "page": None})
+
+
+TRUE_RUNWAY = _doc(
+    "Monthly net burn: approximately $720,000. Implied runway at current burn: ~12.8 months.",
+    "acme_10k_excerpt.md",
+)
+FLOODED_RUNWAY = _doc(
+    "Implied runway at current burn is 512 months. The company runway is 512 months.",
+    "flood_runway.md",
+)
+
+
+def test_conflicting_sources_are_detected():
+    """The attack claim-level verification structurally cannot catch.
+
+    Measured live: a hostile upload asserting 512 months of runway crowded the true
+    document out of top_k, and the resulting answer was scored *grounded* because it
+    faithfully reflected the chunks it was given. Verifying an answer against its sources
+    says nothing when the sources are the problem; the retrieved set disagreeing with
+    itself is observable without trusting either side.
+    """
+    conflicts = find_conflicts([TRUE_RUNWAY, FLOODED_RUNWAY])
+    assert len(conflicts) == 1
+
+    values = {v["value"]: v["source"] for v in conflicts[0].values}
+    assert values == {"12.8": "acme_10k_excerpt.md", "512": "flood_runway.md"}
+    assert "runway" in conflicts[0].context
+
+
+def test_neighbouring_metrics_in_one_document_are_not_a_conflict():
+    """Two different measures sitting next to each other share nearly all their words.
+
+    "Gross margin: 61%. Net revenue retention of 118%." matched at overlap 1.0 and was
+    reported as a contradiction between two entirely unrelated metrics. Restricting
+    comparison to *different sources* removes the whole class.
+    """
+    pitch = _doc("Gross margin: 61%. Net revenue retention of 118%.", "acme_robotics_pitch.md")
+    assert find_conflicts([TRUE_RUNWAY, pitch]) == []
+    assert find_conflicts([pitch]) == []
+
+
+def test_agreeing_sources_are_not_a_conflict():
+    duplicate = _doc("Implied runway at current burn: ~12.8 months.", "backup_copy.md")
+    assert find_conflicts([TRUE_RUNWAY, duplicate]) == []
+
+
+def test_percentages_are_never_compared_against_dollar_amounts():
+    a = _doc("The option pool is 12% of the post-financing capitalisation.", "a.md")
+    b = _doc("The option pool is $12,000,000 of the post-financing capitalisation.", "b.md")
+    assert find_conflicts([a, b]) == []
+
+
+def test_years_do_not_generate_conflicts():
+    """Years sit near every figure and would bury the real signal."""
+    a = _doc("The venture debt facility matures in 2027 under the agreement.", "a.md")
+    b = _doc("The venture debt facility matures in 2029 under the agreement.", "b.md")
+    assert find_conflicts([a, b]) == []
+
+
+def test_conflicts_are_reported_even_when_the_answer_refused():
+    """A contradiction is a property of the corpus, not of the answer."""
+    report = verify_answer(
+        "The provided documents do not cover this.", [TRUE_RUNWAY, FLOODED_RUNWAY]
+    )
+    assert report.verdict == "refusal"
+    assert len(report.conflicts) == 1

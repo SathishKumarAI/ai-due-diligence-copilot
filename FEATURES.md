@@ -28,6 +28,10 @@ Each feature has a spec in [`docs/specs/`](docs/specs/) (the source of truth).
 | F21 | Cleaning pipeline + hardened prompts | ✅ | [F21](docs/specs/F21-cleaning-prompts.md) |
 | F22 | Open-access corpus fetch (SEC EDGAR) | ✅ | [F22](docs/specs/F22-corpus.md) |
 | F23 | Pipeline trace + introspection UI | ✅ | [F23](docs/specs/F23-trace-introspection.md) |
+| F24 | Claim-level grounding verification | ✅ | `app/grounding.py`, `web/components/GroundingPanel.tsx` |
+| F25 | Ragas multi-dimensional eval | ✅ | `eval/run_ragas.py` (informational; `--gate` to block) |
+| F26 | Embedding map export (TensorBoard Projector) | ✅ | [`docs/EMBEDDING-MAP.md`](docs/EMBEDDING-MAP.md) |
+| F27 | Cross-source figure conflict detection | ✅ | `app/grounding.py:find_conflicts` |
 
 Understand the pipeline: [`docs/HOW-RAG-WORKS.md`](docs/HOW-RAG-WORKS.md) ·
 [`docs/INGESTION.md`](docs/INGESTION.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

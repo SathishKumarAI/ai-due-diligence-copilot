@@ -96,10 +96,29 @@ class ClaimVerdictModel(BaseModel):
     span_end: int | None = None
 
 
+class FigureConflictModel(BaseModel):
+    """Two retrieved sources giving different values for the same quantity (feature F27)."""
+
+    context: list[str] = Field(
+        default_factory=list, description="Shared words naming what the figures measure"
+    )
+    values: list[dict] = Field(
+        default_factory=list, description="{value, source, snippet} per disagreeing source"
+    )
+
+
 class GroundingReportModel(BaseModel):
     """Per-claim verification of an answer against its retrieved chunks (feature F24)."""
 
     claims: list[ClaimVerdictModel] = Field(default_factory=list)
+    conflicts: list[FigureConflictModel] = Field(
+        default_factory=list,
+        description=(
+            "Disagreements between the retrieved sources themselves (F27). Claim-level "
+            "verification cannot see these: it checks the answer against the chunks, so a "
+            "false figure from a hostile source is faithfully 'grounded'."
+        ),
+    )
     grounded: int = 0
     weak: int = 0
     unsupported: int = 0
