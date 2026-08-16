@@ -52,6 +52,7 @@ def build_engine() -> RagEngine:
         reranker=build_reranker(settings),
         fetch_k=settings.retrieve_fetch_k,
         history_max_turns=settings.history_max_turns,
+        max_chunks_per_source=settings.max_chunks_per_source,
     )
 
 

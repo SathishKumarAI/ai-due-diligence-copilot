@@ -279,3 +279,64 @@ def test_ask_accepts_history(api_client):
     body = r.json()
     assert body["answer"]
     assert "condense_ms" in body["timings_ms"]
+
+
+# --- source diversity cap (retrieval flooding) -------------------------------------
+
+
+def _doc(source: str, text: str = "x"):
+    from langchain_core.documents import Document
+
+    return Document(page_content=text, metadata={"source": source})
+
+
+def test_cap_per_source_stops_one_document_owning_every_slot():
+    # The attack this blocks, measured against the running app: one uploaded document
+    # produced 12 near-identical chunks, filled all 5 retrieved slots, and the answer
+    # became that document's claim with all 5 citations pointing at it.
+    from app.retrieval import cap_per_source
+
+    flood = [_doc("hostile.md") for _ in range(12)]
+    truth = [_doc("a.md"), _doc("b.md"), _doc("c.md")]
+    kept = cap_per_source(flood + truth, k=5, cap=2)
+
+    sources = [d.metadata["source"] for d in kept]
+    assert len(kept) == 5
+    assert sources.count("hostile.md") == 2, sources
+    assert {"a.md", "b.md", "c.md"} <= set(sources)
+
+
+def test_cap_is_best_effort_when_there_are_too_few_sources():
+    # Honest limit: the cap cannot invent diversity. With only three sources available
+    # and k=5, reaching k needs a fourth chunk from somewhere, so the flood gets one
+    # extra slot. It still loses 5/5 dominance, which is the property that matters.
+    from app.retrieval import cap_per_source
+
+    flood = [_doc("hostile.md") for _ in range(12)]
+    kept = cap_per_source(flood + [_doc("a.md"), _doc("b.md")], k=5, cap=2)
+    sources = [d.metadata["source"] for d in kept]
+    assert sources.count("hostile.md") == 3
+    assert {"a.md", "b.md"} <= set(sources)
+
+
+def test_cap_backfills_rather_than_returning_too_few():
+    # A corpus that legitimately has only one relevant source must still get k results;
+    # diversity is preferred, never required.
+    from app.retrieval import cap_per_source
+
+    only = [_doc("single.md") for _ in range(6)]
+    assert len(cap_per_source(only, k=5, cap=2)) == 5
+
+
+def test_cap_disabled_passes_through():
+    from app.retrieval import cap_per_source
+
+    docs = [_doc("a.md") for _ in range(6)]
+    assert len(cap_per_source(docs, k=4, cap=0)) == 4
+
+
+def test_cap_preserves_rank_order():
+    from app.retrieval import cap_per_source
+
+    docs = [_doc("a.md", "1"), _doc("b.md", "2"), _doc("a.md", "3"), _doc("c.md", "4")]
+    assert [d.page_content for d in cap_per_source(docs, k=4, cap=2)] == ["1", "2", "3", "4"]
