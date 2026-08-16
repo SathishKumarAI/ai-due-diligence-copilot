@@ -153,6 +153,40 @@ contact details out of the repos. The script now requires `SEC_USER_AGENT` and e
 with instructions rather than failing silently. **Setting a real address is the repo
 owner's call, so no corpus is indexed yet and no meaningful baseline exists.**
 
+## Web UI (F14, F18, F19, F23) — first execution
+
+`web/node_modules` was a Linux install and had to be reinstalled. `tsc --noEmit` and
+`next build` both pass clean (3 routes). Then the UI turned out never to have rendered
+an answer at all.
+
+**The chat was dead.** Clicking any question left the caret blinking forever, while the
+POST to `/v1/ask/stream` returned 200 and the server finished streaming in 7.8s.
+`sse-starlette` terminates lines with CRLF, so frames arrive separated by `\r\n\r\n`:
+
+```
+e v e n t :   t o k e n \r \n d a t a :   T h e \r \n \r \n
+```
+
+`web/lib/api.ts` split frames on `"\n\n"`, which never matched. Everything accumulated
+in the buffer; the end-of-stream flush passed the whole response to `handleFrame` as one
+frame; `JSON.parse` threw; and `catch { /* ignore malformed trailing frame */ }`
+swallowed it. A total failure with 200 on the wire and a clean console. Because the F23
+inspector hangs off the answer bubble, **the feature the README leads with was
+unreachable.** Fixed by normalising CRLF on the buffer.
+
+Verified in Chrome against API :8000 + the production Next build on :3000:
+
+| Path | Result |
+|---|---|
+| Ask (streaming) | renders "ARR is $12.4M, up from $8.9M … 39% YoY growth" with a `[1]` chip |
+| Sources panel | `acme_robotics_pitch.md` with snippet |
+| **F23 inspector** | stage strip, 10 token chips, 4 chunks with distances, prompt accordion (3032 ctx chars), retrieve 15.8ms / generate 2588.3ms |
+| F19 follow-up | "And how does that compare to the prior year?" — condense resolved "that" and answered from history |
+| F19 feedback | thumbs-up persisted to `data/feedback.jsonl` |
+| F18 + F20 upload | scanned PDF (no text layer) → OCR → indexed → later cited: *"Gross margin is 61 percent [1]"* |
+| F15 What's New | live GitHub release rendered |
+| OCR probe | `ocr_available() True`; both the image and the `pdf2image`/Poppler path work — the MiKTeX-supplied Poppler is fine |
+
 ## Open, found by running — not yet fixed
 
 - **A refusal still returns 4 citations.** The answer says the documents do not cover the
@@ -167,6 +201,16 @@ owner's call, so no corpus is indexed yet and no meaningful baseline exists.**
 - **`eval/` and `scripts/` are outside the lint gate.** CI runs `ruff check app tests`
   only, so neither the harness nor the fetchers were ever linted or type-checked — both
   files shipped with defects that a gate covering them would likely have caught.
+- **`web/` has no test runner at all.** The SSE parser above is exactly the logic that
+  should have one. Adding a runner is a dependency decision (CLAUDE.md: don't add
+  dependencies without asking), so it is flagged rather than done.
+- **`/ready` can report `ready: true` with `indexed_chunks: -1`.** Re-ingesting while the
+  API is serving leaves it holding a stale Chroma handle; the bare `except` returns the
+  `-1` sentinel and readiness still says healthy. Restarting the API restores `4`. A
+  readiness probe that cannot see its collection arguably should not report ready.
+- **Release notes render as literal markdown** on What's New (`**bold**` shows asterisks).
+  `AnswerText.tsx` states the no-markdown-library policy explicitly, so this is that
+  policy meeting markdown-authored release notes — a decision, not an oversight.
 - **No lockfile.** Every drift above traces back to range-pinned requirements. Until there is
   a lockfile, a green gate today says nothing about tomorrow.
 - **MED and ENG need `scripts/sync_engine.py`** — engine files changed here, so their

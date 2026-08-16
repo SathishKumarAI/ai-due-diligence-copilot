@@ -14,3 +14,13 @@ venv/
 # Generated artifacts
 chroma_db/
 .cache/
+
+# Runtime data written into data/ at request time. These were untracked but NOT
+# ignored, so a plain `git add -A` after any real use would have committed whatever
+# documents users uploaded and every question/answer pair they rated.
+data/uploads/
+data/feedback.jsonl
+# Fetched corpus: real filings, large, and re-fetchable with scripts/fetch_corpus.py.
+# data/SOURCES.md is deliberately NOT ignored — it is the provenance and licence record
+# for a public repo and should travel with it.
+data/corpus/
