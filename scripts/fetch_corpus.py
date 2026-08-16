@@ -10,7 +10,8 @@ Design:
 - **stdlib only** (urllib) — no extra dependency, runs anywhere.
 - **Idempotent** — skips files already present; re-run to add new companies only.
 - **Polite** — sends the SEC-required descriptive User-Agent and rate-limits requests.
-- **Offline-safe** — network errors are logged and skipped, never fatal (CI-friendly).
+- **Offline-safe** — a single ticker's network error is logged and skipped, never fatal;
+  fetching *nothing at all* does exit non-zero, so a dead run cannot read as success.
 - **Provenance** — every download is recorded in ``data/SOURCES.md`` with its URL.
 
 Usage:
@@ -18,8 +19,9 @@ Usage:
     python scripts/fetch_corpus.py --limit 3       # first 3 companies only
     python scripts/fetch_corpus.py --dry-run       # list what would be fetched
 
-Set a contact per SEC guidelines (a GitHub URL is fine):
-    SEC_USER_AGENT="my-project (github.com/you)" python scripts/fetch_corpus.py
+SEC_USER_AGENT is **required** — SEC 403s any request without a contact email, and a
+GitHub URL or noreply address is not accepted (see the measurements below):
+    SEC_USER_AGENT="Jane Roe jane@example.com" python scripts/fetch_corpus.py
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ import html
 import json
 import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -38,21 +41,43 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CORPUS_DIR = PROJECT_ROOT / "data" / "corpus"
 SOURCES_FILE = PROJECT_ROOT / "data" / "SOURCES.md"
 
-# SEC asks for a descriptive UA that identifies the requester. Only a public GitHub
-# handle is used — no personal contact details in the repo.
-USER_AGENT = os.environ.get(
-    "SEC_USER_AGENT", "rag-learning-companion (github.com/SathishKumarAI)"
-)
+# SEC requires a User-Agent carrying a real contact address, in "Name email@domain"
+# form, and rejects anything else with a blanket 403. Measured against
+# data.sec.gov/submissions/CIK0000320193.json on 2026-08-16:
+#
+#   rag-learning-companion (github.com/SathishKumarAI)                    403
+#   rag-learning-companion SathishKumarAI@users.noreply.github.com        403
+#   RAG Learning Companion SathishKumarAI@users.noreply.github.com        403
+#   rag-learning-companion acme@example.com                               200
+#   RAG Learning Companion acme@example.com                               200
+#
+# So an email is mandatory (the handle-only default could never have worked), and
+# GitHub's users.noreply.github.com domain is blocked outright — which is why this
+# cannot simply reuse the repo's git identity. Deliberately left unset: no contact
+# address is committed to this repo. Export SEC_USER_AGENT to supply your own.
+USER_AGENT = os.environ.get("SEC_USER_AGENT", "")
+
+USER_AGENT_HELP = """SEC_USER_AGENT is not set.
+
+SEC EDGAR rejects requests without a contact email and returns 403 for every fetch.
+Set a User-Agent of the form "Your Name your-email@domain":
+
+    export SEC_USER_AGENT="Jane Roe jane@example.com"      # bash
+    $env:SEC_USER_AGENT = "Jane Roe jane@example.com"      # PowerShell
+
+Note: users.noreply.github.com addresses are blocked by SEC - use a deliverable one.
+No contact address is stored in this repo, which is why this must come from the
+environment. See docs/INGESTION.md."""
 RATE_LIMIT_SECONDS = 0.5  # SEC allows up to 10 req/s; stay well under.
 
 # A small set of well-known public companies (CIK, ticker). 10-Ks are the classic
 # due-diligence document, so they exercise the finance RAG well.
 COMPANIES: list[tuple[str, str]] = [
-    ("0000320193", "AAPL"),   # Apple
-    ("0000789019", "MSFT"),   # Microsoft
-    ("0001018724", "AMZN"),   # Amazon
+    ("0000320193", "AAPL"),  # Apple
+    ("0000789019", "MSFT"),  # Microsoft
+    ("0001018724", "AMZN"),  # Amazon
     ("0001652044", "GOOGL"),  # Alphabet
-    ("0001045810", "NVDA"),   # NVIDIA
+    ("0001045810", "NVDA"),  # NVIDIA
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -132,16 +157,34 @@ def fetch(limit: int | None, dry_run: bool) -> int:
     return saved
 
 
-def main() -> None:
+def main() -> int:
     ap = argparse.ArgumentParser(description="Fetch open finance corpus (SEC EDGAR 10-Ks).")
     ap.add_argument("--limit", type=int, default=None, help="max companies to fetch")
     ap.add_argument("--dry-run", action="store_true", help="list URLs, download nothing")
     args = ap.parse_args()
+
+    # Fail before the first request rather than after five identical 403 warnings.
+    if not USER_AGENT.strip():
+        print(USER_AGENT_HELP, file=sys.stderr)
+        return 2
+
     n = fetch(args.limit, args.dry_run)
-    if not args.dry_run:
-        print(f"\nDone. {n} new document(s) in {CORPUS_DIR.relative_to(PROJECT_ROOT)}.")
-        print("Next: python -m app.ingest  (re)builds the index over the new corpus.")
+    if args.dry_run:
+        return 0
+
+    print(f"\nDone. {n} new document(s) in {CORPUS_DIR.relative_to(PROJECT_ROOT)}.")
+    if n == 0:
+        # Previously this path printed "Done." and exited 0, so a corpus fetch that
+        # downloaded nothing at all looked like a success to a caller or a CI step.
+        print(
+            "\nNo documents were fetched. If every ticker logged a 403, SEC rejected "
+            f"SEC_USER_AGENT={USER_AGENT!r} — it must carry a deliverable contact email.",
+            file=sys.stderr,
+        )
+        return 1
+    print("Next: python -m app.ingest  (re)builds the index over the new corpus.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
