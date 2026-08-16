@@ -101,3 +101,18 @@ def client(monkeypatch, fake_engine):
     with TestClient(main.app) as c:
         yield c
     main.app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def isolate_caches(tmp_path, monkeypatch):
+    """Never let the test suite touch the real .cache directory.
+
+    It used to. The offline tests wrote fixture answers into the same diskcache the
+    running app reads, and because the key was built from settings.provider ("ollama")
+    while the answer came from a FakeChat engine, the app then served
+    "Based on the passages, the answer is grounded [1]." to a real question. Autouse so
+    no future test can opt out of the isolation by forgetting to ask for it.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "cache_dir", tmp_path / "cache")
