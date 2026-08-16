@@ -24,14 +24,18 @@ jobs:
       # The lock must be a faithful compile of the ranges. Editing requirements.txt and
       # forgetting scripts/lock.sh would otherwise ship a lock that no longer matches
       # what the project says it depends on.
+      #
+      # This runs scripts/lock.sh rather than restating its uv invocation. The previous
+      # version restated it, drifted from it (no --universal) and wrote to /tmp, so it
+      # compared a linux-only resolution against a universal one AND compared headers
+      # that record the -o path. It reported a stale lock on every run, unfixable by
+      # re-locking. A check that reimplements the thing it checks is a check that lies.
       - name: Lockfile is up to date
         run: |
-          pipx run uv pip compile requirements.txt     -c constraints.txt -o /tmp/req.lock --quiet
-          pipx run uv pip compile requirements-dev.txt -c constraints.txt -o /tmp/dev.lock --quiet
-          diff -u requirements.lock /tmp/req.lock \
-            || { echo "::error::requirements.lock is stale - run scripts/lock.sh"; exit 1; }
-          diff -u requirements-dev.lock /tmp/dev.lock \
-            || { echo "::error::requirements-dev.lock is stale - run scripts/lock.sh"; exit 1; }
+          pip install uv
+          bash scripts/lock.sh
+          git diff --exit-code -- requirements.lock requirements-dev.lock \
+            || { echo "::error::locks are stale - run scripts/lock.sh and commit the result"; exit 1; }
 
       # eval/ and scripts/ were outside the gate, which is part of why the eval harness
       # shipped unable to import app/, and the corpus fetcher shipped exiting 0 on a

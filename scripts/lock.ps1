@@ -9,8 +9,11 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   throw "uv not found: https://docs.astral.sh/uv/"
 }
 
-uv pip compile requirements.txt     -c constraints.txt -o requirements.lock
-uv pip compile requirements-dev.txt -c constraints.txt -o requirements-dev.lock
+# --universal: see scripts/lock.sh. Locking without it on Windows drops triton, uvloop
+# and the nvidia-* wheels, which makes the CI freshness check unsatisfiable and leaves
+# the Linux image's torch dependencies unpinned.
+uv pip compile requirements.txt     -c constraints.txt --universal -o requirements.lock
+uv pip compile requirements-dev.txt -c constraints.txt --universal -o requirements-dev.lock
 
 $pin = (Select-String -Path requirements.lock -Pattern '^torch==').Line
 Write-Host ""
