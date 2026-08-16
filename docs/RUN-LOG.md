@@ -113,6 +113,46 @@ exercised by any test.
 **Offline suite on this interpreter:** `64 passed, 1 warning in 4.35s`, exit 0.
 Gate: `ruff check` clean · `ruff format --check` clean · `mypy app` clean · `pytest` exit 0.
 
+## Eval harness (F10) — first execution
+
+It had never run: `python eval/run_eval.py` puts `eval/` on `sys.path`, not the repo
+root, so `import app` raised `ModuleNotFoundError` on line 1. That is the invocation in
+both the docstring and the `eval:` Makefile target. Fixed, along with the harness
+building its engine with no retriever and no reranker (it now goes through
+`app.main.build_engine`) and a judge parser where `"GROUNDED" in verdict` also matched
+`"NOT GROUNDED"`.
+
+```
+provider=ollama model=llama3.1:8b retrieval=hybrid rerank=False top_k=5
+
+Retrieval hit-rate : 100%  (threshold 70%)
+Faithfulness       :  80%  (threshold 70%)
+PASS      10 questions, 28.6s, exit 0
+```
+
+**Read the hit-rate as vacuous, not good.** The corpus is 4 chunks and `top_k` is 5, so
+retrieval returns the entire corpus for every question and the metric cannot discriminate.
+It means something only against a real corpus.
+
+## Corpus fetch (F22) — blocked on a contact address
+
+`scripts/fetch_corpus.py` 403s on every ticker, then printed `Done. 0 new document(s)`
+and exited 0. Measured, with the original UA repeated to rule out rate-limiting:
+
+| User-Agent | Result |
+|---|---|
+| `rag-learning-companion (github.com/SathishKumarAI)` | **403** (×2) |
+| `rag-learning-companion SathishKumarAI@users.noreply.github.com` | **403** |
+| `RAG Learning Companion SathishKumarAI@users.noreply.github.com` | **403** |
+| `rag-learning-companion acme@example.com` | 200 |
+| `RAG Learning Companion acme@example.com` | 200 |
+
+SEC requires a deliverable contact email, so the handle-only default could never work —
+and it blocks `users.noreply.github.com`, the very identity this project adopted to keep
+contact details out of the repos. The script now requires `SEC_USER_AGENT` and exits 2
+with instructions rather than failing silently. **Setting a real address is the repo
+owner's call, so no corpus is indexed yet and no meaningful baseline exists.**
+
 ## Open, found by running — not yet fixed
 
 - **A refusal still returns 4 citations.** The answer says the documents do not cover the
@@ -121,12 +161,12 @@ Gate: `ruff check` clean · `ruff format --check` clean · `mypy app` clean · `
   It is deliberate and asserted by `tests/test_citations.py`, so it needs a decision rather
   than a quiet change — but shipping four source cards under "the documents do not cover
   this" inverts the product's core promise.
-- **The eval harness does not measure the shipped system.** `eval/run_eval.py:41` builds the
-  engine with no retriever and no reranker, so it silently scores pure dense retrieval no
-  matter what `RETRIEVAL_MODE=hybrid` says. Any number it produces today describes a system
-  nobody ships. Fix before recording a baseline.
-- **No real corpus yet.** `data/` is still the 4 synthetic Acme files; `scripts/fetch_corpus.py`
-  (SEC EDGAR) has never been run, so there is no `data/corpus/` and no `data/SOURCES.md`.
+- **No real corpus yet**, and it needs a decision rather than code: export
+  `SEC_USER_AGENT="Name email@domain"` with an address you are willing to publish in
+  request headers, then `python scripts/fetch_corpus.py && python -m app.ingest`.
+- **`eval/` and `scripts/` are outside the lint gate.** CI runs `ruff check app tests`
+  only, so neither the harness nor the fetchers were ever linted or type-checked — both
+  files shipped with defects that a gate covering them would likely have caught.
 - **No lockfile.** Every drift above traces back to range-pinned requirements. Until there is
   a lockfile, a green gate today says nothing about tomorrow.
 - **MED and ENG need `scripts/sync_engine.py`** — engine files changed here, so their
