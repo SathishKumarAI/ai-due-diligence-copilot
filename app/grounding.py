@@ -81,6 +81,15 @@ WEAK_COVERAGE = 0.40
 _META_RE = re.compile(
     r"\b(?:i cannot|i can't|i am unable|i'm unable|cannot provide|can't provide"
     r"|not mentioned|no mention|not provided|no information|do not have|don't have"
+    # Absence claims. Measured over the eval set: "The provided documents do not
+    # explicitly state the potential financial impact" was scored *unsupported* at 0.20
+    # coverage, which reads as "the model made this up" when the model did the opposite -
+    # it declined, correctly, and said so. A lexical checker cannot verify an absence
+    # anyway: there is no span in the source that proves something is missing from it.
+    # Scoring it as a failed claim is worse than not scoring it.
+    r"|do(?:es)? not (?:explicitly |specifically )?(?:state|specify|mention|say|indicate"
+    r"|detail|disclose|cover|include|provide)"
+    r"|don't (?:explicitly |specifically )?(?:state|specify|mention|say)"
     r"|if you'd like|if you would like|would you like|let me know)\b",
     re.IGNORECASE,
 )

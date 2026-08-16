@@ -202,3 +202,31 @@ def test_grouped_markers_produce_one_citation_each(fake_engine):
     fake_engine.llm.reply = "Everything agrees [1, 2]."
     cites = fake_engine.answer("q").citations
     assert [c.marker for c in cites] == [1, 2]
+
+
+def test_an_absence_claim_is_meta_not_unsupported():
+    """ "The documents do not state X" is a refusal, not a fabrication.
+
+    Measured over the eval set before this was handled: llama3.1:8b ended answers with
+    "Note: The provided documents do not explicitly state the potential financial impact",
+    which scored 0.20 coverage and "unsupported" - the same verdict a made-up figure gets.
+    A lexical checker cannot verify an absence either way, since no span in the source can
+    prove something is missing from it, so scoring it as a failed claim is worse than not
+    scoring it.
+    """
+    verdict = verify_claim(
+        "The provided documents do not explicitly state the potential financial impact.",
+        [1],
+        [PITCH],
+    )
+    assert verdict.status == "meta"
+
+
+def test_positive_claims_using_the_same_verbs_are_still_checked():
+    """The absence pattern must not swallow real claims that merely say "states"."""
+    grounded = verify_claim("Gross margin is 61%.", [1], [PITCH])
+    assert grounded.status == "grounded"
+
+    invented = verify_claim("The term sheet states a valuation of $999,000,000.", [1], [PITCH])
+    assert invented.status == "unsupported"
+    assert "$999,000,000" in invented.unsupported_figures
