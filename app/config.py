@@ -1,12 +1,21 @@
 """Application settings, loaded from environment / .env.
 
-A single PROVIDER switch picks the model backend:
+PROVIDER picks the model backend for both halves of the pipeline:
   - "ollama" (default): free, local — llama3.1 + HuggingFace embeddings
   - "claude": Anthropic Claude + Voyage embeddings (needs API keys)
+  - "openai": any OpenAI-compatible endpoint — OpenAI itself by default, or
+    Groq / Together / DeepSeek / vLLM / TGI / LM Studio via OPENAI_BASE_URL
+
+The two halves are independent. LLM_PROVIDER and EMBED_PROVIDER each override
+PROVIDER for their own half, so a local generator can run against cloud
+embeddings or the reverse. Unset (the default), both follow PROVIDER and the
+single-switch behaviour is unchanged.
 """
 
 from __future__ import annotations
 
+import hashlib
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -14,14 +23,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+ProviderName = Literal["ollama", "claude", "openai"]
+
+# Hosts that are this machine (or the machine hosting the container). An
+# OpenAI-compatible server here is vLLM / TGI / LM Studio / Ollama, not a vendor,
+# so LOCAL_ONLY must not refuse it. See app/providers.py.
+LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- provider selection ---
-    provider: Literal["ollama", "claude"] = "ollama"
-    # Fully-local guard: when true (default), the Claude/Voyage cloud provider is refused
-    # even if PROVIDER=claude. Set LOCAL_ONLY=false to allow the cloud path.
+    provider: ProviderName = "ollama"
+    # Per-half overrides. Empty (the default) means "follow PROVIDER", which keeps every
+    # existing single-switch .env working untouched. Set either to mix backends, e.g.
+    # LLM_PROVIDER=claude with EMBED_PROVIDER=ollama.
+    llm_provider: Literal["", "ollama", "claude", "openai"] = ""
+    embed_provider: Literal["", "ollama", "claude", "openai"] = ""
+    # Fully-local guard: when true (default), any cloud provider is refused for the half
+    # that selects it, even if PROVIDER names it. Set LOCAL_ONLY=false to allow cloud.
     local_only: bool = True
 
     # --- open-source (Ollama + HuggingFace) ---
@@ -39,6 +60,15 @@ class Settings(BaseSettings):
     voyage_api_key: str = ""
     anthropic_model: str = "claude-opus-4-8"
     voyage_model: str = "voyage-3.5"
+
+    # --- OpenAI-compatible endpoints ---
+    # One adapter, many vendors: everything below speaks the same wire format, so the
+    # only thing that changes between OpenAI, Groq, Together, DeepSeek, Mistral, vLLM,
+    # TGI and LM Studio is the base URL and the model id.
+    openai_api_key: str = ""
+    openai_base_url: str = ""  # "" -> the vendor default (api.openai.com)
+    openai_llm_model: str = "gpt-4o-mini"
+    openai_embed_model: str = "text-embedding-3-small"
 
     # --- retrieval / generation ---
     # 400, not 1000. At 1000 every document in data/ fit inside a single chunk, so one
@@ -118,6 +148,54 @@ class Settings(BaseSettings):
     @property
     def auth_required(self) -> bool:
         return bool(self.api_key)
+
+    # --- the two halves of the provider seam ---
+
+    @property
+    def active_llm_provider(self) -> ProviderName:
+        return self.llm_provider or self.provider
+
+    @property
+    def active_embed_provider(self) -> ProviderName:
+        return self.embed_provider or self.provider
+
+    @property
+    def active_llm_model(self) -> str:
+        return {
+            "ollama": self.ollama_llm_model,
+            "claude": self.anthropic_model,
+            "openai": self.openai_llm_model,
+        }[self.active_llm_provider]
+
+    @property
+    def active_embed_model(self) -> str:
+        return {
+            "ollama": self.hf_embed_model,
+            "claude": self.voyage_model,
+            "openai": self.openai_embed_model,
+        }[self.active_embed_provider]
+
+    @property
+    def active_collection_name(self) -> str:
+        """Chroma collection for the *current embedding model*.
+
+        A vector only means anything to the model that produced it. With a fixed
+        collection name, changing HF_EMBED_MODEL re-opened the previous model's
+        collection: at a different dimensionality Chroma raises, and — far worse — at
+        the same dimensionality it does not, and every subsequent answer is retrieved
+        from vectors the new model never made. Keying the collection on the embedding
+        provider and model turns that silent corruption into a fresh, empty collection
+        that /health reports as needing an ingest.
+
+        A hash, not the model id: HuggingFace ids are unbounded and Chroma caps a
+        collection name at 63 characters. The mapping is logged on ingest.
+        """
+        fingerprint = f"{self.active_embed_provider}:{self.active_embed_model}"
+        digest = hashlib.sha256(fingerprint.encode()).hexdigest()[:12]
+        # The configured base name is user-supplied; keep it to Chroma's charset and
+        # leave room for the suffix.
+        base = re.sub(r"[^a-zA-Z0-9_-]", "_", self.collection_name)[:40].strip("._-")
+        return f"{base or 'corpus'}_{digest}"
 
 
 settings = Settings()

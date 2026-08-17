@@ -47,7 +47,7 @@ def build_engine() -> RagEngine:
         store,
         llm,
         top_k=settings.top_k,
-        provider=settings.provider,
+        provider=settings.active_llm_provider,
         retriever=build_retriever(store, settings),
         reranker=build_reranker(settings),
         fetch_k=settings.retrieve_fetch_k,
@@ -90,7 +90,7 @@ def _corpus_fingerprint() -> str:
     count = _count_chunks(engine)
     if count is None:
         return "unknown"
-    return f"{settings.collection_name}:{count}"
+    return f"{settings.active_collection_name}:{count}"
 
 
 @asynccontextmanager
@@ -98,7 +98,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     try:
         app.state.engine = build_engine()
-        log.info("engine_ready", provider=settings.provider)
+        log.info(
+            "engine_ready",
+            llm_provider=settings.active_llm_provider,
+            llm_model=settings.active_llm_model,
+            embed_provider=settings.active_embed_provider,
+            embed_model=settings.active_embed_model,
+        )
     except Exception as exc:  # noqa: BLE001 - degrade gracefully if not yet ingested
         app.state.engine = None
         log.warning("engine_unavailable", error=str(exc))
@@ -164,7 +170,10 @@ def health() -> schemas.HealthResponse:
         status="ok",
         app=settings.app_name,
         version=settings.app_version,
-        provider=settings.provider,
+        provider=settings.active_llm_provider,
+        llm_model=settings.active_llm_model,
+        embed_provider=settings.active_embed_provider,
+        embed_model=settings.active_embed_model,
     )
 
 
@@ -338,7 +347,7 @@ async def upload(
     engine.retriever = build_retriever(engine.vectorstore, settings)
     log.info("upload_indexed", filename=safe_name, chunks=added)
     return schemas.UploadResponse(
-        filename=safe_name, chunks_added=added, collection=settings.collection_name
+        filename=safe_name, chunks_added=added, collection=settings.active_collection_name
     )
 
 

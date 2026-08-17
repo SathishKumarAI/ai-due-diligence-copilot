@@ -8,7 +8,7 @@ Each feature has a spec in [`docs/specs/`](docs/specs/) (the source of truth).
 | F01 | Document ingestion pipeline | ✅ | [F01](docs/specs/F01-ingestion.md) |
 | F02 | Retrieval + vector store | ✅ | [F02](docs/specs/F02-retrieval.md) |
 | F03 | Grounded answers with citations | ✅ | [F03](docs/specs/F03-citations.md) |
-| F04 | Pluggable model providers | ✅ | [F04](docs/specs/F04-providers.md) |
+| F04 | Pluggable model providers (ollama / claude / any OpenAI-compatible; LLM and embedder chosen independently) | ✅ | [F04](docs/specs/F04-providers.md) |
 | F05 | REST API | ✅ | [F05](docs/specs/F05-api.md) |
 | F06 | Streaming responses (SSE) | ✅ | [F06](docs/specs/F06-streaming.md) |
 | F07 | Caching (answer + embedding) | ✅ | [F07](docs/specs/F07-caching.md) |

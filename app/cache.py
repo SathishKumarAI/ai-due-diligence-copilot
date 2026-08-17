@@ -34,9 +34,19 @@ def embedding_namespace(settings: Settings) -> str:
 
     Only the active provider's model is included: switching providers must land in a
     different namespace, and the idle provider's model name has no business in the key.
+
+    The *embedding* half, not PROVIDER: since the two halves became independent,
+    reading PROVIDER here would have put a cached vector under the generator's name
+    and served it to a different embedding model.
     """
-    model = settings.voyage_model if settings.provider == "claude" else settings.hf_embed_model
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", f"{settings.provider}-{model}") + "-"
+    return (
+        re.sub(
+            r"[^A-Za-z0-9_.-]",
+            "_",
+            f"{settings.active_embed_provider}-{settings.active_embed_model}",
+        )
+        + "-"
+    )
 
 
 def wrap_embeddings(embeddings: Embeddings, settings: Settings) -> Embeddings:
@@ -73,12 +83,10 @@ class AnswerCache:
             from diskcache import Cache
 
             self._cache = Cache(str(settings.cache_dir / "answers"))
-        self._provider = settings.provider
+        self._provider = settings.active_llm_provider
         # The generating model matters as much as the provider name: two runs of
         # "ollama" against different models are not interchangeable answers.
-        self._model = (
-            settings.anthropic_model if settings.provider == "claude" else settings.ollama_llm_model
-        )
+        self._model = settings.active_llm_model
         self._fingerprint = corpus_fingerprint
 
     def _key(self, question: str, top_k: int) -> str:

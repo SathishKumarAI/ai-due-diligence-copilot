@@ -47,7 +47,10 @@ Deploy `web/` to Vercel; set `NEXT_PUBLIC_API_BASE_URL` to the backend URL and
 |---------|-------|-----|
 | `503 Index not built` | no `chroma_db/` | run `python -m app.ingest` |
 | `/ready` shows 0 chunks | empty/!ingested corpus | add docs to `data/`, re-ingest |
-| Answers ignore a new doc | switched `PROVIDER` (different embed space) | re-ingest |
+| Answers ignore a new doc | switched the embedding model/provider — a different embed space means a different collection | re-ingest |
+| `/ready` went to 0 chunks after an env change | `HF_EMBED_MODEL` / `EMBED_PROVIDER` changed, so a new, empty collection is now selected. This is the guard working: the alternative is answering from another model's vectors | re-ingest; change the setting back to reach the old collection |
+| `chroma_db/` growing across model experiments | each embedding model keeps its own collection, and none are deleted automatically — they are the only copy of that model's vectors | list them with `chromadb.PersistentClient(path="chroma_db").list_collections()` and delete the ones you no longer want |
+| A model change made no difference to retrieval | only the LLM half changed; the index is keyed on the embedding half | check `/health`: `provider`/`llm_model` vs `embed_provider`/`embed_model` |
 | Connection refused (ollama) | daemon down / wrong URL | start Ollama; check `OLLAMA_BASE_URL` |
 | `401` from `/v1/*` | `API_KEY` set, header missing | send `X-API-Key` |
 | `429` | rate limit hit | back off or raise `RATE_LIMIT_PER_MIN` |
