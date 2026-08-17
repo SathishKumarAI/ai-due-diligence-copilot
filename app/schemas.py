@@ -185,7 +185,12 @@ class HealthResponse(BaseModel):
     status: str
     app: str
     version: str
+    # The generator's provider. Kept under the old name so existing clients still read
+    # something true; the two halves can differ, so the fields below say which is which.
     provider: str
+    llm_model: str = ""
+    embed_provider: str = ""
+    embed_model: str = ""
 
 
 class ReadyResponse(BaseModel):

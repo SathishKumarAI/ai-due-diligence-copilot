@@ -31,7 +31,7 @@ passages, traceable to a source, and runnable with no paid API keys. Three conse
 
 | Module | Responsibility |
 |---|---|
-| `app/config.py` | All settings via pydantic-settings; the `PROVIDER` switch and every tunable |
+| `app/config.py` | All settings via pydantic-settings; the `PROVIDER` / `LLM_PROVIDER` / `EMBED_PROVIDER` switches, the model-keyed collection name, and every tunable |
 | `app/providers.py` | **The seam.** `get_llm` / `get_embeddings` return LangChain interfaces per provider |
 | `app/ingest.py` | Load → clean → split → dedupe → embed → persist (idempotent rebuild) |
 | `app/ocr.py` | OCR for images + scanned PDFs (Tesseract, F20) |
@@ -167,16 +167,26 @@ Notes worth internalizing:
 
 Everything upstream of `providers.py` depends on **LangChain abstractions**
 (`BaseChatModel`, `Embeddings`) — never `ChatOllama`, `ChatAnthropic`, etc. directly. One
-factory decides the concrete class from `settings.provider`, and imports are lazy so an
-unused backend's package need not be installed (or reachable) to run or test.
+factory decides the concrete class per provider, and imports are lazy so an unused
+backend's package need not be installed (or reachable) to run or test.
+
+**The seam has two halves.** `get_llm` follows `LLM_PROVIDER` and `get_embeddings`
+follows `EMBED_PROVIDER`, each falling back to `PROVIDER` when unset. Mixing is the
+point: the generator and the embedder answer to different constraints — one is a quality
+and cost decision made per question, the other is a decision baked into every vector in
+the store — and welding them to one switch forced a re-embed of the whole corpus just to
+try a different model.
 
 ```mermaid
 flowchart LR
-    CFG["config.py: PROVIDER"] --> PF["providers.get_llm / get_embeddings"]
-    PF -->|ollama| O["ChatOllama (llama3.1:8b) + HuggingFaceEmbeddings (bge-small)"]
-    PF -->|claude| A["ChatAnthropic (claude-opus-4-8) + VoyageAIEmbeddings (voyage-3.5)"]
+    CFG["config.py: PROVIDER<br/>LLM_PROVIDER / EMBED_PROVIDER"] --> PF["providers.get_llm / get_embeddings"]
+    PF -->|ollama| O["ChatOllama (llama3.1:8b)<br/>HuggingFaceEmbeddings (bge-small)"]
+    PF -->|claude| A["ChatAnthropic (claude-opus-4-8)<br/>VoyageAIEmbeddings (voyage-3.5)"]
+    PF -->|openai| X["ChatOpenAI + OpenAIEmbeddings<br/>against OPENAI_BASE_URL"]
+    X -.-> V["OpenAI · Groq · Together · DeepSeek<br/>vLLM · TGI · LM Studio"]
     O -.returns.-> IFACE["BaseChatModel / Embeddings interfaces"]
     A -.returns.-> IFACE
+    X -.returns.-> IFACE
     IFACE --> ENG["RagEngine + ingest depend ONLY on these interfaces"]
     FAKE["tests inject fakes implementing the same interfaces"] --> ENG
 ```
@@ -185,13 +195,26 @@ Why it matters:
 
 | Benefit | How the seam delivers it |
 |---|---|
-| Free↔paid switch | one env var `PROVIDER=ollama|claude`; no code change |
+| Free↔paid switch | one env var `PROVIDER=ollama\|claude\|openai`; no code change |
+| Mix the halves | `LLM_PROVIDER=claude` with `EMBED_PROVIDER=ollama` — a strong generator over an index you already built |
+| One adapter, many vendors | everything that speaks the OpenAI wire format is reached by changing `OPENAI_BASE_URL`, not by adding code |
 | Offline CI | tests inject fake `BaseChatModel` / `Embeddings` / `Retriever` / `Reranker` — no network, no model download |
 | Swap retrieval / rerank | `RagEngine` takes a `Retriever` and `Reranker` **protocol**; `build_retriever` / `build_reranker` pick the impl by config |
 | Trustworthy citations | `RagEngine` never sees a vendor response shape — it works off `Document` metadata |
 
-> **Consequence:** `ollama` and `claude` embed into **different vector spaces**. Changing
-> `PROVIDER` invalidates the index — **re-ingest** before querying.
+**`LOCAL_ONLY` is judged by endpoint, not by name.** `claude` is always cloud and
+`ollama` never is, but `openai` is either, depending on where it points — vLLM, TGI, LM
+Studio and Ollama all serve the same wire format on localhost. The guard resolves the
+host in `OPENAI_BASE_URL` against `config.LOCAL_HOSTS`, and refuses only the half that
+selected a cloud endpoint, so a local generator with cloud embeddings fails on the
+embeddings alone rather than taking down the app.
+
+> **Consequence:** each embedding model has its **own vector space**, so each gets its own
+> Chroma collection, named `{COLLECTION_NAME}_{hash(embed_provider:embed_model)}`.
+> Changing the embedding model selects an empty collection and `/health` reports the
+> corpus as unindexed — **re-ingest**. Before this was enforced the index was silently
+> reused across models, which raises on a dimension change and, at matching dimensions,
+> does not raise at all. Changing the *LLM* half leaves the index alone.
 
 ---
 

@@ -17,6 +17,15 @@ sidebar_position: 2
 | F17 | Re-ranker (cross-encoder) | P2 | [F17](specs/F17-reranker.md) |
 | F18 | Per-document upload via UI | P2 | [F18](specs/F18-upload.md) |
 | F19 | Conversation memory + answer feedback | P2 | [F19](specs/F19-conversation-feedback.md) |
+| F04+ | Provider seam split into LLM/embedding halves; OpenAI-compatible adapter; Chroma collection keyed on the embedding model | P1 | [F04](specs/F04-providers.md) |
+
+## Next (P2 — specced but not built)
+
+| Item | Why | Blocked on |
+|------|-----|------------|
+| Gemini adapter | the one major vendor that does not speak the OpenAI wire format | nothing; needs `langchain-google-genai` |
+| Model-comparison harness (sweep combinations through `make eval`) | turning the new matrix into a table instead of one run at a time | a real corpus — four synthetic documents would measure noise |
+| Fine-tuning track (embedder + cross-encoder on the corpus) | the next step after choosing among off-the-shelf models | the RTX host, and a corpus worth training on |
 
 ## Shipped (v0.1.0)
 

@@ -110,7 +110,7 @@ def build_index(settings: Settings | None = None, embeddings: Embeddings | None 
     chunks = split_documents(docs, settings)
 
     store = Chroma(
-        collection_name=settings.collection_name,
+        collection_name=settings.active_collection_name,
         persist_directory=str(settings.chroma_dir),
         embedding_function=embeddings,
     )
@@ -124,16 +124,25 @@ def build_index(settings: Settings | None = None, embeddings: Embeddings | None 
     result = {
         "documents": len({d.metadata["source"] for d in docs}),
         "chunks": len(chunks),
-        "collection": settings.collection_name,
+        "collection": settings.active_collection_name,
     }
-    logger.info("ingest_complete", extra=result)
+    # The collection name is a hash, so log what it was derived from — otherwise the
+    # only way to tell which embedding model owns a collection is to recompute it.
+    logger.info(
+        "ingest_complete",
+        extra={
+            **result,
+            "embed_provider": settings.active_embed_provider,
+            "embed_model": settings.active_embed_model,
+        },
+    )
     return result
 
 
 def load_index(settings: Settings, embeddings: Embeddings) -> Chroma:
     """Open the persisted Chroma collection for querying."""
     return Chroma(
-        collection_name=settings.collection_name,
+        collection_name=settings.active_collection_name,
         persist_directory=str(settings.chroma_dir),
         embedding_function=embeddings,
     )

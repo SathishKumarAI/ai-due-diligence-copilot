@@ -288,7 +288,7 @@ def main() -> int:
     # to notice: compare `chunks` here against /ready's indexed_chunks.
     manifest = {
         "generated_at": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
-        "collection": settings.collection_name,
+        "collection": settings.active_collection_name,
         "embed_model": settings.hf_embed_model,
         "points": len(vectors),
         "dimensions": dim,
@@ -308,7 +308,7 @@ def main() -> int:
             {
                 "embeddings": [
                     {
-                        "tensorName": f"{settings.collection_name} - chunks, tokens, queries",
+                        "tensorName": f"{settings.active_collection_name} - chunks, tokens, queries",
                         "tensorShape": [len(vectors), dim],
                         "tensorPath": "rag_data/vectors.tsv",
                         "metadataPath": "rag_data/metadata.tsv",

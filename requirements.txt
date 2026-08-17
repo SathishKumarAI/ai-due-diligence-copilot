@@ -20,6 +20,12 @@ sentence-transformers>=3,<6
 langchain-anthropic>=0.3,<1
 langchain-voyageai>=0.1,<1
 
+# OpenAI-compatible provider (optional): OpenAI, Groq, Together, DeepSeek, Mistral,
+# and any self-hosted vLLM / TGI / LM Studio endpoint. One client, many backends.
+# Already present transitively via ragas; declared here because app/providers.py
+# imports it directly and a transitive pin is not a dependency contract.
+langchain-openai>=0.3,<1
+
 # API
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1

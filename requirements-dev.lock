@@ -219,7 +219,9 @@ langchain-huggingface==0.3.1
 langchain-ollama==0.3.10
     # via -r requirements.txt
 langchain-openai==0.3.35
-    # via ragas
+    # via
+    #   -r requirements.txt
+    #   ragas
 langchain-text-splitters==0.3.11
     # via
     #   -r requirements.txt
