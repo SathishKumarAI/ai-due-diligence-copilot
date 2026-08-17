@@ -1,13 +1,56 @@
 # STATUS — ai-due-diligence-copilot (FIN)
 
-**Last touched:** 2026-08-16 · **Branch:** `main` · **Tree:** clean
+**Last touched:** 2026-08-17 · **Branch:** `fix/docker-base-cves` · **Tree:** clean
 
 This is the **reference repo** of three siblings. Engine changes are made here and pushed
 outward with `scripts/sync_engine.py`. MED (`healthcare-knowledge-navigator`) and ENG
-(`engineering-intelligence-hub`) are in sync as of today — but **neither has been pushed**;
-see "Next action".
+(`engineering-intelligence-hub`) both have their catch-up PR open and passing `quality`
+for the first time; see "Next action".
 
-## Where it stopped
+## Where it stopped (2026-08-17)
+
+**PR #20 is merged** (`0fdd77f`) — the provider seam now has two independent halves and an
+OpenAI-compatible adapter. All three CI jobs green.
+
+**PR [#21](https://github.com/SathishKumarAI/ai-due-diligence-copilot/pull/21) is open and
+rebuilding:** `apt-get upgrade` in the Dockerfile runtime stage. This repo's `docker` job
+passed today and **would have failed on the next push** — the siblings hit 9 HIGH findings
+on the identical base image minutes later, all `CVE-2026-53615` in Debian's `util-linux`.
+The only difference was Trivy's database updating in between. Measured with CI's own Trivy
+version and flags: 9 findings / exit 1 → **0 findings / exit 0**.
+
+Local gate on the merged tree:
+
+```
+pytest                140 passed        (was 119; 21 new provider tests)
+ruff check            All checks passed!
+ruff format --check   35 files already formatted
+mypy app              Success: no issues found in 19 source files
+npm test (web)        5 passed
+python -m app.ingest  4 documents, 11 chunks -> due_diligence_182f5fd57187
+```
+
+Real query, `ollama`/`llama3.1:8b` + `bge-small`, `LOCAL_ONLY=true`:
+*"What is the pre-money valuation in the term sheet?"* →
+*"The pre-money valuation is $180,000,000 [2]."* citing `acme_term_sheet.md`.
+
+### What #20 changed
+
+`PROVIDER` welded the generator to the embedder. `LLM_PROVIDER` and `EMBED_PROVIDER` now
+pick each half, both defaulting to `PROVIDER`, so every existing `.env` is untouched. The
+new `openai` provider is one adapter for everything speaking that wire format — OpenAI,
+Groq, Together, DeepSeek, vLLM, TGI, LM Studio — selected by `OPENAI_BASE_URL`. `LOCAL_ONLY`
+is now judged per half and **by endpoint**, so `openai` pointed at localhost is correctly
+treated as local.
+
+It also fixed a silent corruption: `collection_name` was the constant `"due_diligence"`, so
+changing `HF_EMBED_MODEL` reopened the *previous* model's collection. At a different
+dimensionality Chroma raises; **at the same dimensionality it does not**, and answers come
+from vectors the current model never made. `docs/specs/F04` had carried "switching provider
+invalidates the index → re-ingest" as an operator instruction since v0.1.0 and nothing
+enforced it. Now keyed on the embedding half.
+
+## The earlier ship (2026-08-16)
 
 **Everything is on `origin/main`, and CI is green there for the first time.** The 40 commits
 that had never left this disk shipped as 18 reviewed PRs (#1–#18), squash-merged in
@@ -35,16 +78,27 @@ vitest run            5 passed
 
 ## Next action
 
-Pick one:
+In order:
 
-1. **Ship MED and ENG.** Each has 3 unpushed commits on `chore/sync-from-fin-2026-08` plus
-   an unpushed `rag-p3`, and `main` on both is still at the pre-sync commit. They are now the
-   only copies of that work on one disk — the risk FIN just retired.
-   **They almost certainly carry the same manifest defect fixed in #16** (see Traps).
-2. **Get a real corpus in.** Almost every remaining limitation is downstream of a 4-document
+1. **Merge PR #21** when green.
+2. **Sync the provider work into MED and ENG.** `python scripts/sync_engine.py --to
+   ../healthcare-knowledge-navigator ../engineering-intelligence-hub`, **plus a hand-copy**
+   of three things the manifest does not track: the provider block in `app/config.py`
+   (~83 lines), `tests/test_providers.py`, and the `langchain-openai` line in
+   `requirements.txt`. The engine now *imports* `ProviderName` and `LOCAL_HOSTS` from
+   `app/config.py`, so a sync without the config block will not import. Then relock and
+   regenerate the manifest.
+3. **`chunk_size` 1000 → 400 in MED and ENG.** User approved 2026-08-17. The numbers are in
+   the umbrella `../STATUS.md` — **do not reuse this repo's justification**, the sibling
+   hit@1 does not improve and ENG's gets marginally worse. Ship it for citation precision:
+   at 1000 each document is one chunk, so `app/grounding.py:240` verifies a claim against
+   an entire document's token set.
+4. **Training track** (fine-tune embedder + cross-encoder). Architectural — design doc
+   before code. Needs the RTX host and a corpus worth training on.
+5. **Get a real corpus in.** Almost every remaining limitation is downstream of a 4-document
    synthetic sample. Blocked on one env var: `SEC_USER_AGENT` needs a deliverable contact
    email (SEC EDGAR rejects `users.noreply.github.com`, measured in `docs/INGESTION.md`).
-3. **Grow the eval set.** `scripts/generate_testset.py` produces synthesis and multi-hop
+6. **Grow the eval set.** `scripts/generate_testset.py` produces synthesis and multi-hop
    questions the hand-written set does not have. It already found the failure mode the
    hand-written set is blind to.
 
@@ -72,18 +126,34 @@ reimplements the thing it checks will drift from it.
 
 ## Traps
 
-- **MED and ENG will have the manifest defect from #16** if their manifests were regenerated
-  from a Windows tree. `sync_engine.py --check` will report drift that is really CRLF. Fix by
-  refreshing the tree through `.gitattributes` (`git rm --cached -r . && git reset --hard`,
-  no content change) and regenerating.
+- **The manifest defect from #16 was in MED and ENG, and is now fixed there** (2026-08-17).
+  Both held 2457 CR across `app/*.py` and all 12 manifest entries were wrong. Fixed by
+  refreshing each tree through `.gitattributes` (`git rm --cached -r . && git reset --hard`,
+  no content change) and copying this repo's `sync_engine.py`, whose generator now writes the
+  manifest with `newline="\n"`. If it reappears, that is the recipe.
+- **A green Trivy run is not a Trivy run that stays green.** This repo's `docker` job passed
+  and the siblings failed on the identical base image minutes later, purely because Trivy's
+  DB updated. The Dockerfile now runs `apt-get upgrade` in the runtime stage — the gate uses
+  `ignore-unfixed`, so it blocks only on findings that *have* a patch, and suppressing one in
+  `.trivyignore` would defeat the point of that file.
 - **`requirements.lock` is what ships.** Editing `requirements.txt` alone changes nothing in
   the image. Run `scripts/lock.sh` (needs `uv`) — and it must stay `--universal`.
 - **`app/config.py` and `app/prompts.py` are NOT in the engine manifest** — deliberately, they
-  are per-domain. But a synced `main.py` reading a new setting will crash a sibling whose
-  config lacks it. After any sync, grep for settings the new engine code reads.
-- **`scripts/setup.*`, `Dockerfile.gpu`, the lockfiles and `.github/workflows/ci.yml` are not
-  manifest-tracked**, so `test_parity` will not catch drift in them. Copy them by hand on the
-  next sync — the CI and lock fixes above have not reached the siblings.
+  are per-domain. This trap fired for real on 2026-08-17: the engine now *imports*
+  `ProviderName` and `LOCAL_HOSTS` from `app/config.py`, so syncing `app/*.py` without the
+  config block will not even import. After any sync, grep for settings and symbols the new
+  engine code reads.
+- **The same gap silently stalls measured fixes in this repo.** `chunk_size` moved 1000 → 400
+  here in PR #12 and never reached the siblings, because `config.py` is never synced. Both are
+  still at 1000. Whenever a fix lands in `config.py`, it reaches MED and ENG only by hand.
+- **`scripts/setup.*`, `Dockerfile*`, `scripts/lock.*`, `scripts/sync_engine.py`, the
+  lockfiles and `.github/workflows/ci.yml` are not manifest-tracked**, so `test_parity` will
+  not catch drift in them. Copy by hand. **`ci.yml` embeds the repo name** in the
+  `docker build` tag and the Trivy `image-ref` — a blind copy retags a sibling's image as this
+  one's.
+- **Chroma teardown locks files on Windows.** Wrapping a `PersistentClient` in a
+  `TemporaryDirectory` raises `PermissionError` on cleanup. Embed and rank in memory when
+  measuring retrieval.
 - **`pytest -q` hides the summary.** `pyproject.toml` already sets `addopts = "-q"`, so an
   extra `-q` makes it `-qq` and the pass/fail line vanishes. Use `pytest` bare.
 - **Ragas scores are self-assessment** — the judge is the same llama3.1:8b that wrote the
