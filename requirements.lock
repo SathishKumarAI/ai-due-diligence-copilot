@@ -2,8 +2,9 @@
 #    uv pip compile requirements.txt -c constraints.txt --universal -o requirements.lock
 aiohappyeyeballs==2.7.1
     # via aiohttp
-aiohttp==3.14.3
+aiohttp==3.14.5
     # via
+    #   -c constraints.txt
     #   kubernetes
     #   langchain-community
     #   voyageai
@@ -37,8 +38,9 @@ bcrypt==5.0.0
     # via chromadb
 build==1.5.0
     # via chromadb
-certifi==2026.7.22
+certifi==2026.10.23
     # via
+    #   -c constraints.txt
     #   httpcore
     #   httpx
     #   kubernetes
@@ -80,8 +82,9 @@ durationpy==0.10
     # via kubernetes
 fastapi==0.141.1
     # via -r requirements.txt
-filelock==3.32.3
+filelock==4.2.9
     # via
+    #   -c constraints.txt
     #   huggingface-hub
     #   torch
 flatbuffers==25.12.19
@@ -265,8 +268,10 @@ nvidia-nvshmem-cu13==3.4.5 ; sys_platform == 'linux'
     # via torch
 nvidia-nvtx==13.0.85 ; sys_platform == 'linux'
     # via cuda-toolkit
-oauthlib==3.3.1
-    # via requests-oauthlib
+oauthlib==4.0.1
+    # via
+    #   -c constraints.txt
+    #   requests-oauthlib
 ollama==0.6.2
     # via langchain-ollama
 onnxruntime==1.28.0
@@ -311,7 +316,7 @@ packaging==25.0
     #   transformers
 pdf2image==1.17.0
     # via -r requirements.txt
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   -r requirements.txt
     #   pdf2image
@@ -354,7 +359,7 @@ pydantic-settings==2.15.0
     #   langchain-community
 pygments==2.20.0
     # via rich
-pypdf==6.16.1
+pypdf==6.21.4
     # via -r requirements.txt
 pypika==0.51.1
     # via chromadb
@@ -513,8 +518,9 @@ typing-inspection==0.4.4
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via
+    #   -c constraints.txt
     #   kubernetes
     #   requests
 uuid-utils==0.17.0
@@ -539,7 +545,7 @@ websockets==17.0.1
     #   uvicorn
 xxhash==4.0.0
     # via langsmith
-yarl==1.24.5
+yarl==1.25.1
     # via aiohttp
 zstandard==0.25.0
     # via langsmith

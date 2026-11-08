@@ -20,3 +20,39 @@
 #   uv pip compile requirements.txt     -c constraints.txt -o requirements.lock
 #   uv pip compile requirements-dev.txt -c constraints.txt -o requirements-dev.lock
 torch<2.12
+
+# CVE floors, added 2026-11-07. These three arrive transitively — aiohttp via
+# kubernetes/langchain-community/voyageai, filelock via huggingface-hub/torch,
+# oauthlib via requests-oauthlib — so there is no range of ours to widen. Without a
+# floor here the fix is recorded nowhere: `uv pip compile` prefers whatever is already
+# in the lock, so today's pins survive a relock by accident rather than by intent, and
+# a from-scratch resolve would quietly reintroduce the vulnerable versions.
+#
+# Trivy, 2026-11-01, on the CPU image: 55 findings, 49 HIGH + 6 CRITICAL.
+#   aiohttp  < 3.14.4  CVE-2026-111064, CVE-2026-111066  HIGH      denial of service
+#   oauthlib < 4.0.0   CVE-2026-118669, CVE-2026-49272   HIGH      privilege escalation
+#   filelock < 4.2.1   CVE-2026-112940                   HIGH      arbitrary file overwrite
+#
+# pillow is NOT here on purpose: it is a direct dependency, so its floor belongs in
+# requirements.txt, which now reads pillow>=13,<14 (was <13, which forbade the fix for
+# two CRITICAL heap overflows).
+#
+# Drop a line from this list only when every parent's own range has caught up, so the
+# resolver would pick the safe version unaided.
+aiohttp>=3.14.4
+oauthlib>=4.0.0
+filelock>=4.2.1
+
+# Second pass, same day. The first pass fixed only the four packages visible in the
+# top of Trivy's table and left 21 findings behind - read the whole report, not its
+# first screenful. certifi and urllib3 are transitive (requests, kubernetes, and most
+# of the HTTP stack); pypdf is direct and its existing <7 range already allowed the
+# fix, it simply was not in the upgrade set.
+#
+#   certifi < 2026.10.18  GHSA-6q48-6c7w-9gw2  CRITICAL  bundles emSign root CAs
+#                                                        whose keys are compromised
+#   urllib3 < 2.8.0       CVE-2026-97687       HIGH      traffic interception via
+#                                                        HTTPS proxy TLS
+#                         CVE-2026-97689       HIGH      unbounded-memory DoS
+certifi>=2026.10.18
+urllib3>=2.8.0
