@@ -9,7 +9,7 @@ pypdf>=6.14.2,<7
 # OCR ingestion (F20) — needs the system Tesseract binary + Poppler (see scripts/install-ocr.sh)
 pytesseract>=0.3.10,<1
 pdf2image>=1.17,<2
-pillow>=12.3,<13
+pillow>=13,<14
 
 # Open-source provider (default)
 langchain-ollama>=0.2,<1
