@@ -38,8 +38,9 @@ bcrypt==5.0.0
     # via chromadb
 build==1.5.0
     # via chromadb
-certifi==2026.7.22
+certifi==2026.10.23
     # via
+    #   -c constraints.txt
     #   httpcore
     #   httpx
     #   kubernetes
@@ -358,7 +359,7 @@ pydantic-settings==2.15.0
     #   langchain-community
 pygments==2.20.0
     # via rich
-pypdf==6.16.1
+pypdf==6.21.4
     # via -r requirements.txt
 pypika==0.51.1
     # via chromadb
@@ -517,8 +518,9 @@ typing-inspection==0.4.4
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via
+    #   -c constraints.txt
     #   kubernetes
     #   requests
 uuid-utils==0.17.0
